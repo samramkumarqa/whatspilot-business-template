@@ -1,0 +1,49 @@
+# Template render.yaml for a single customer's business-portal
+# deployment. Every business gets its own repo (generated from this
+# template - see the whatspilot-admin repo's provisioning module) and
+# its own Render web service using this config, with `name` and
+# BUSINESS_ID set to that specific customer's values.
+services:
+  - type: web
+    name: whatspilot-business
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # --proxy-headers + --forwarded-allow-ips="*" matter beyond just
+    # logging: rate_limit.py's OTP-send/verify limiters key on phone
+    # number, but Render still sits in front of the app as a proxy -
+    # these flags tell uvicorn to trust Render's X-Forwarded-For header
+    # and use the real client IP instead of Render's internal proxy IP
+    # anywhere request.client.host is used.
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DEBUG
+        value: "false"
+      - key: SESSION_SECRET_KEY
+        generateValue: true
+      # The business_id assigned to this customer in the admin app's
+      # registry (Businesses page) - confines this deployment to only
+      # ever serving this one business, even though DATABASE_URL below
+      # points at the same shared Postgres every other customer's
+      # deployment also connects to. See config.py.
+      - key: BUSINESS_ID
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_NUMBER
+        sync: false
+      - key: TWILIO_VERIFY_SERVICE_SID
+        sync: false
+      - key: OTP_CHANNEL
+        value: sms
+      # Same shared Postgres instance the admin app connects to (Render
+      # dashboard -> your Postgres -> Internal Database URL).
+      - key: DATABASE_URL
+        sync: false

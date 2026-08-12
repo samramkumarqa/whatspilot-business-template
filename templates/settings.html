@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Settings - Website AI Assistant</title>
+
+    <style>
+
+:root {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #dbeafe;
+  --color-primary-lighter: #eff6ff;
+  --color-blue: #3b82f6;
+
+  --color-gray-50: #f8fafc;
+  --color-gray-100: #e2e8f0;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #cbd5e1;
+  --color-gray-500: #94a3b8;
+  --color-gray-600: #64748b;
+  --color-gray-700: #475569;
+  --color-text-dark: #1e293b;
+  --color-text-darkest: #0f172a;
+
+  --color-danger: #ef4444;
+  --color-danger-dark: #dc2626;
+  --color-danger-light: #fee2e2;
+
+  --color-warning: #f59e0b;
+  --color-warning-dark: #92400e;
+  --color-warning-light: #fef3c7;
+
+  --color-success: #22c55e;
+  --color-success-dark: #166534;
+  --color-success-light: #dcfce7;
+
+  --shadow-sm: rgba(0, 0, 0, 0.05);
+  --shadow-md: rgba(0, 0, 0, 0.08);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+
+  font-family: "Segoe UI", sans-serif;
+
+  background: #f4f7fb;
+
+  color: var(--color-text-dark);
+
+  padding: 14px;
+}
+
+/* HEADER */
+
+.crm-header {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  background: white;
+
+  border-radius: 18px;
+
+  padding: 18px 26px;
+
+  margin-bottom: 20px;
+
+  box-shadow: 0 8px 20px var(--shadow-md);
+}
+
+.crm-brand {
+  display: flex;
+
+  align-items: center;
+
+  gap: 18px;
+}
+
+.logo-circle {
+  width: 56px;
+
+  height: 56px;
+
+  border-radius: 16px;
+
+  background: linear-gradient(135deg, var(--color-primary), var(--color-blue));
+
+  color: white;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  font-size: 28px;
+
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.25);
+}
+
+.crm-title {
+  margin: 0;
+  font-size: 28px;
+  color: var(--color-primary);
+}
+
+.crm-header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.header-link-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  border: none;
+
+  border-radius: 12px;
+
+  background: var(--color-gray-50);
+
+  cursor: pointer;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  color: var(--color-primary);
+
+  text-decoration: none;
+
+  padding: 10px 18px;
+
+  transition: 0.2s;
+}
+
+.header-link-btn:hover {
+  background: var(--color-primary-lighter);
+}
+
+/* SETTINGS CARD */
+
+.card {
+  background: white;
+  border: none;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 15px var(--shadow-md);
+}
+
+h2 {
+  margin-bottom: 20px;
+
+  font-size: 32px;
+
+  color: var(--color-primary);
+
+  font-weight: 700;
+}
+
+.card > h3 {
+  margin-bottom: 18px;
+  margin-top: 8px;
+}
+
+/* BUTTONS */
+
+button {
+  background: var(--color-primary);
+
+  color: white;
+
+  border: none;
+
+  border-radius: 10px;
+
+  padding: 10px 18px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+button:hover {
+  background: var(--color-primary-hover);
+
+  transform: translateY(-2px);
+}
+
+/* INPUTS */
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+
+  padding: 10px;
+
+  border: 1px solid #d1d5db;
+
+  border-radius: 10px;
+
+  margin-top: 5px;
+
+  margin-bottom: 10px;
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+input:disabled,
+button:disabled {
+  background: var(--color-gray-50);
+
+  color: var(--color-gray-500);
+
+  cursor: not-allowed;
+}
+
+button:disabled:hover {
+  background: var(--color-gray-50);
+  transform: none;
+}
+
+.website-limit-note {
+  margin-top: 10px;
+
+  padding: 10px 14px;
+
+  background: var(--color-warning-light);
+
+  border-radius: 8px;
+
+  color: var(--color-warning-dark);
+
+  font-size: 13px;
+}
+
+/* Field validation - character counters and inline error text shared by
+   every input/textarea on this page (WhatsApp Number, Website URL,
+   Business Name, Welcome Message, AI Instructions). */
+.char-counter {
+  display: block;
+
+  margin-top: -6px;
+  margin-bottom: 10px;
+
+  font-size: 12px;
+
+  color: var(--color-gray-500);
+
+  text-align: right;
+}
+
+.char-counter.char-counter-limit {
+  color: var(--color-danger-dark);
+  font-weight: 600;
+}
+
+.field-error {
+  display: none;
+
+  margin-top: -6px;
+  margin-bottom: 10px;
+
+  font-size: 12px;
+
+  color: var(--color-danger-dark);
+}
+
+.field-error.visible {
+  display: block;
+}
+
+input.field-invalid,
+textarea.field-invalid {
+  border-color: var(--color-danger);
+}
+
+#websiteList {
+  list-style: none;
+}
+
+#websiteList li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-gray-100);
+}
+
+.website-url {
+  flex: 1;
+}
+
+.reindex-site-btn {
+  background: var(--color-gray-50);
+  color: var(--color-primary);
+}
+
+.reindex-site-btn:hover {
+  background: var(--color-primary-lighter);
+  transform: none;
+}
+
+.reindex-site-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.spinner {
+  display: inline-block;
+
+  width: 12px;
+  height: 12px;
+
+  margin-right: 6px;
+
+  border: 2px solid var(--color-primary-light);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+
+  vertical-align: middle;
+
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.website-status {
+  margin-top: 14px;
+  color: var(--color-gray-600);
+  font-size: 14px;
+}
+
+/* INDEXED PAGES (child pages discovered under the one indexed website) */
+
+.indexed-pages-block .indexed-page-list {
+  list-style: none;
+  margin-top: 4px;
+}
+
+.indexed-pages-block .indexed-page-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 8px 0;
+
+  border-bottom: 1px solid var(--color-gray-100);
+
+  font-size: 13px;
+}
+
+.indexed-pages-block .indexed-page-list li:last-child {
+  border-bottom: none;
+}
+
+.indexed-page-url {
+  flex: 1;
+
+  word-break: break-all;
+
+  color: var(--color-gray-700);
+}
+
+.indexed-page-chunks {
+  flex-shrink: 0;
+
+  color: var(--color-gray-500);
+}
+
+.indexed-pages-empty {
+  margin-top: 12px;
+
+  padding: 10px 14px;
+
+  background: var(--color-gray-50);
+
+  border-radius: 8px;
+
+  color: var(--color-gray-600);
+
+  font-size: 13px;
+}
+
+/* COLLAPSIBLE HELP BLOCKS (AI Instructions, website crawling, ...) */
+
+.help-details {
+  background: var(--color-gray-50);
+
+  border: 1px solid var(--color-gray-100);
+
+  border-radius: 10px;
+
+  padding: 12px 16px;
+
+  margin-top: 12px;
+  margin-bottom: 10px;
+
+  font-size: 14px;
+
+  color: var(--color-gray-700);
+}
+
+.help-details summary {
+  font-weight: 700;
+
+  cursor: pointer;
+
+  color: var(--color-text-dark);
+
+  user-select: none;
+}
+
+.help-details[open] summary {
+  margin-bottom: 10px;
+}
+
+.help-details p {
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.help-details p:first-of-type {
+  margin-top: 0;
+}
+
+    </style>
+
+</head>
+
+<body>
+
+<!-- ===================================================== -->
+<!-- HEADER -->
+<!-- ===================================================== -->
+
+<div class="crm-header">
+
+    <div class="crm-brand">
+
+        <div class="logo-circle">
+            ⚙️
+        </div>
+
+        <div>
+
+            <h2 class="crm-title" style="margin:0;">
+                Settings
+            </h2>
+
+        </div>
+
+    </div>
+
+    <div class="crm-header-right">
+
+        <a href="/" class="header-link-btn" title="Back to Dashboard">
+            ← Dashboard
+        </a>
+
+        <a href="/logout" class="header-link-btn" title="Logout">
+            Logout
+        </a>
+
+    </div>
+
+</div>
+
+<!-- ===================================================== -->
+<!-- SETTINGS -->
+<!-- ===================================================== -->
+
+<div class="card">
+
+    <!-- ========================= -->
+    <!-- User Settings -->
+    <!-- ========================= -->
+
+    <label>WhatsApp Number</label>
+
+    <input
+        id="userId"
+        value="{{ user_id or '' }}"
+        placeholder="+14155238886"
+        maxlength="16"
+        inputmode="tel"
+        oninput="sanitizePhoneInput(this)"
+    >
+    <div id="userIdError" class="field-error"></div>
+
+    <label>Website URL</label>
+
+    <input
+        id="websiteUrl"
+        placeholder="https://example.com"
+        maxlength="500"
+        type="url"
+        oninput="sanitizeUrlInput(this)"
+    >
+    <div id="websiteUrlError" class="field-error"></div>
+
+    <button id="addWebsiteBtn" onclick="addWebsite()">
+        Add Website
+    </button>
+
+    <details class="help-details">
+        <summary>ℹ️ How does indexing this website work?</summary>
+        <p>
+            You only add one page - your homepage - but the AI doesn't
+            just learn from that page. Every time it indexes (right after
+            you add a website, or whenever you hit Reindex), it first
+            checks the site's sitemap.xml, which is the site's own list
+            of its real pages, and is faster and more accurate than
+            guessing from links. If there's no sitemap, it falls back to
+            following links starting from the homepage instead.
+        </p>
+        <p>
+            Either way, it's capped at 25 pages so indexing stays fast
+            and the AI's answers stay focused, and it automatically skips
+            pages that aren't useful knowledge - login, cart, checkout,
+            account, search, and admin pages, plus files like PDFs and
+            images.
+        </p>
+    </details>
+
+    <div id="websiteLimitNote" class="website-limit-note" style="display:none;">
+        Only 1 website can be indexed per business. Delete the existing
+        website below before adding a different one.
+    </div>
+
+    <hr style="margin:25px 0">
+
+    <h3>🌐 Indexed Websites</h3>
+
+    <ul id="websiteList"></ul>
+
+    <div id="indexedPagesBlock" class="indexed-pages-block" style="display:none;"></div>
+
+    <div id="websiteStatus" class="website-status"></div>
+
+    <hr style="margin:25px 0">
+
+    <!-- ========================= -->
+    <!-- Business Settings -->
+    <!-- ========================= -->
+
+    <h3>⚙️ Business Settings</h3>
+
+    <input
+        id="businessName"
+        placeholder="Business Name"
+        maxlength="100"
+        oninput="sanitizeBusinessNameInput(this)"
+    >
+    <span id="businessNameCount" class="char-counter">0/100</span>
+    <div id="businessNameError" class="field-error"></div>
+
+    <textarea
+        id="welcomeMessage"
+        placeholder="Welcome Message"
+        maxlength="300"
+        oninput="sanitizeFreeTextInput(this)"
+    ></textarea>
+    <span id="welcomeMessageCount" class="char-counter">0/300</span>
+
+    <details class="help-details">
+        <summary>ℹ️ What are AI Instructions?</summary>
+        <p>
+            Anything you type below is added to your AI assistant's
+            system prompt on every WhatsApp reply, as a standing rule it
+            follows on top of your knowledge base - it doesn't replace
+            your knowledge base, it steers tone and behavior.
+        </p>
+        <p>
+            Some examples: "Always mention our 10-year warranty",
+            "Never quote prices, redirect to our sales team", "Respond
+            only in Tamil", "Keep replies under 3 sentences unless the
+            customer asks for detail".
+        </p>
+    </details>
+
+    <textarea
+        id="aiInstructions"
+        placeholder="AI Instructions"
+        maxlength="1000"
+        oninput="sanitizeFreeTextInput(this)"
+    ></textarea>
+    <span id="aiInstructionsCount" class="char-counter">0/1000</span>
+
+    <button onclick="saveBusinessSettings()">
+        Save Settings
+    </button>
+
+</div>
+
+<script>
+
+function escapeHtml(text) {
+
+    const div = document.createElement("div");
+    div.textContent = text == null ? "" : String(text);
+
+    return div.innerHTML;
+
+}
+
+// Shows an animated spinner (same one used on the Reindex button) next to
+// a status message, so an in-progress state is visually obvious rather
+// than a static hourglass that looks the same whether something is
+// actively happening or stuck.
+function setLoadingStatus(elementId, message) {
+    document.getElementById(elementId).innerHTML =
+        `<span class="spinner"></span>${escapeHtml(message)}`;
+}
+
+// ===============================================================
+// Field validation - WhatsApp Number, Website URL, Business Name,
+// Welcome Message, AI Instructions.
+//
+// Two layers: the sanitize*Input() functions above strip disallowed
+// characters as the user types (wired via oninput on each field), and the
+// validate*() functions below do a final check right before a field's
+// value is actually submitted - catches anything that slipped through
+// (e.g. maxlength doesn't stop a huge pasted string from landing between
+// input events in some browsers) and shows an inline error instead of
+// sending bad data to the server. The server (api/settings.py,
+// api/website.py) enforces the same limits independently, since
+// client-side checks can always be bypassed by calling the API directly.
+// ===============================================================
+
+const FIELD_LIMITS = {
+    userId: 16,
+    websiteUrl: 500,
+    businessName: 100,
+    welcomeMessage: 300,
+    aiInstructions: 1000
+};
+
+function showFieldError(fieldId, message) {
+
+    const input = document.getElementById(fieldId);
+    const errorEl = document.getElementById(`${fieldId}Error`);
+
+    if (input)
+        input.classList.add("field-invalid");
+
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.add("visible");
+    }
+
+}
+
+function clearFieldError(fieldId) {
+
+    const input = document.getElementById(fieldId);
+    const errorEl = document.getElementById(`${fieldId}Error`);
+
+    if (input)
+        input.classList.remove("field-invalid");
+
+    if (errorEl) {
+        errorEl.textContent = "";
+        errorEl.classList.remove("visible");
+    }
+
+}
+
+function updateCharCounter(fieldId) {
+
+    const input = document.getElementById(fieldId);
+    const counter = document.getElementById(`${fieldId}Count`);
+
+    if (!input || !counter)
+        return;
+
+    const max = FIELD_LIMITS[fieldId];
+    const len = input.value.length;
+
+    counter.textContent = `${len}/${max}`;
+    counter.classList.toggle("char-counter-limit", len >= max);
+
+}
+
+// WhatsApp Number: digits only, with an optional single leading "+" -
+// strips letters, spaces, and punctuation as they're typed rather than
+// only complaining after the fact.
+function sanitizePhoneInput(el) {
+
+    const hasLeadingPlus = el.value.startsWith("+");
+    const digits = el.value.replace(/[^0-9]/g, "");
+
+    el.value = (hasLeadingPlus ? "+" : "") + digits;
+
+    clearFieldError("userId");
+
+}
+
+// Website URL: no character stripping - URLs legitimately contain many
+// special characters (: / ? = & % - _ .), so only stray whitespace is
+// trimmed here. Real format validation happens in validateWebsiteUrl()
+// at submit time.
+function sanitizeUrlInput(el) {
+
+    if (/\s/.test(el.value))
+        el.value = el.value.replace(/\s/g, "");
+
+    clearFieldError("websiteUrl");
+
+}
+
+// Business Name: letters, numbers, spaces, and common business-name
+// punctuation ( & - ' . , ) - blocks characters like < > { } ; that have
+// no place in a name.
+function sanitizeBusinessNameInput(el) {
+
+    el.value = el.value.replace(/[^a-zA-Z0-9À-ÿ &'\-.,]/g, "");
+
+    updateCharCounter("businessName");
+    clearFieldError("businessName");
+
+}
+
+// Welcome Message / AI Instructions: free text - these are full sentences
+// (with normal punctuation and emoji), so only HTML-ish angle brackets
+// are stripped as a light markup-injection guard, nothing else.
+function sanitizeFreeTextInput(el) {
+
+    el.value = el.value.replace(/[<>]/g, "");
+
+    updateCharCounter(el.id);
+
+}
+
+function validatePhone(userId) {
+
+    if (!userId)
+        return "WhatsApp Number is required.";
+
+    if (!/^\+?[0-9]{7,15}$/.test(userId))
+        return "WhatsApp Number must be 7-15 digits, with an optional leading +.";
+
+    return null;
+
+}
+
+function validateWebsiteUrl(url) {
+
+    if (!url)
+        return "Website URL is required.";
+
+    if (url.length > FIELD_LIMITS.websiteUrl)
+        return `Website URL must be ${FIELD_LIMITS.websiteUrl} characters or fewer.`;
+
+    if (!/^https?:\/\/[^\s<>"']+$/i.test(url))
+        return "Enter a valid URL starting with http:// or https://.";
+
+    return null;
+
+}
+
+function validateBusinessName(name) {
+
+    if (!name)
+        return "Business Name is required.";
+
+    if (name.length > FIELD_LIMITS.businessName)
+        return `Business Name must be ${FIELD_LIMITS.businessName} characters or fewer.`;
+
+    if (!/^[a-zA-Z0-9À-ÿ &'\-.,]+$/.test(name))
+        return "Business Name can only contain letters, numbers, spaces, and & - ' . ,";
+
+    return null;
+
+}
+
+function validateFreeText(value, maxLen, label) {
+
+    if (value.length > maxLen)
+        return `${label} must be ${maxLen} characters or fewer.`;
+
+    if (/[<>]/.test(value))
+        return `${label} can't contain < or >.`;
+
+    return null;
+
+}
+
+async function addWebsite() {
+
+    const userId =
+        document.getElementById("userId").value.trim();
+
+    const url =
+        document.getElementById("websiteUrl").value.trim();
+
+    const phoneError = validatePhone(userId);
+
+    if (phoneError) {
+        showFieldError("userId", phoneError);
+        return;
+    }
+
+    clearFieldError("userId");
+
+    const urlError = validateWebsiteUrl(url);
+
+    if (urlError) {
+        showFieldError("websiteUrl", urlError);
+        return;
+    }
+
+    clearFieldError("websiteUrl");
+
+    setLoadingStatus("websiteStatus", "Indexing website...");
+
+    const response = await fetch("/website", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            url: url
+        })
+    });
+
+    const data = await response.json();
+
+    if (data.status === "success") {
+        // Indexing itself runs in the background and finishes later (see
+        // schedule_reindex) - showing a checkmark here would claim it's
+        // done when it's really just been kicked off. loadIndexedPages()
+        // flips this to a real completion message once pages actually
+        // show up.
+        setLoadingStatus("websiteStatus", data.message);
+
+        pendingIndexNotification = true;
+
+        document.getElementById("websiteUrl").value = "";
+    } else if (data.status === "limit_reached") {
+        document.getElementById("websiteStatus").innerText =
+            `⚠️ ${data.message}`;
+    } else {
+        document.getElementById("websiteStatus").innerText =
+            `❌ ${data.message}`;
+    }
+
+    loadWebsites();
+}
+
+// Only 1 website can be indexed per business (see website_manager.py's
+// MAX_WEBSITES_PER_USER) - once one is indexed, block adding another from
+// the UI instead of letting the request round-trip just to be rejected.
+function updateWebsiteLimitUI(websiteCount) {
+
+    const limitReached = websiteCount >= 1;
+
+    const urlInput =
+        document.getElementById("websiteUrl");
+
+    const addBtn =
+        document.getElementById("addWebsiteBtn");
+
+    const note =
+        document.getElementById("websiteLimitNote");
+
+    urlInput.disabled = limitReached;
+    addBtn.disabled = limitReached;
+
+    note.style.display = limitReached ? "block" : "none";
+
+}
+
+async function loadWebsites() {
+
+    const userId =
+        document.getElementById("userId").value;
+
+    if (!userId)
+        return;
+
+    const response =
+        await fetch(`/websites/${userId}`);
+
+    const data =
+        await response.json();
+
+    const list =
+        document.getElementById("websiteList");
+
+    list.innerHTML = "";
+
+    data.websites.forEach(site => {
+
+        const li =
+            document.createElement("li");
+
+        li.innerHTML = `
+            <span class="website-url">${escapeHtml(site)}</span>
+            <button class="reindex-site-btn" onclick="reindexUser(this)">
+                Reindex
+            </button>
+            <button onclick="deleteWebsite('${site}')">
+                Delete
+            </button>
+        `;
+
+        list.appendChild(li);
+    });
+
+    updateWebsiteLimitUI(data.websites.length);
+
+    if (data.websites.length > 0) {
+        await loadIndexedPages(userId);
+    } else {
+
+        if (indexedPagesPollTimeout) {
+            clearTimeout(indexedPagesPollTimeout);
+            indexedPagesPollTimeout = null;
+        }
+
+        document.getElementById("indexedPagesBlock").style.display = "none";
+    }
+}
+
+// Indexing a site's pages happens in the background (see
+// api/website.py's schedule_reindex) and can take anywhere from a few
+// seconds to under a minute depending on how many pages it discovers -
+// rather than leaving "no pages indexed yet" on screen until the user
+// manually reloads, keep re-checking for a while after an add/reindex.
+let indexedPagesPollTimeout = null;
+let indexedPagesPollAttempts = 0;
+const INDEXED_PAGES_MAX_POLL_ATTEMPTS = 15;
+const INDEXED_PAGES_POLL_INTERVAL_MS = 3000;
+
+// Set by addWebsite() right after it kicks off background indexing -
+// tells loadIndexedPages() to replace the "started" status message with
+// a real completion message once pages actually land, instead of leaving
+// the "started" message on screen forever.
+let pendingIndexNotification = false;
+
+async function loadIndexedPages(userId, isPoll = false) {
+
+    if (indexedPagesPollTimeout) {
+        clearTimeout(indexedPagesPollTimeout);
+        indexedPagesPollTimeout = null;
+    }
+
+    if (!isPoll) {
+        indexedPagesPollAttempts = 0;
+    }
+
+    const block =
+        document.getElementById("indexedPagesBlock");
+
+    const response =
+        await fetch(`/indexed-pages/${userId}`);
+
+    const data =
+        await response.json();
+
+    const pages = data.pages || [];
+
+    if (pages.length === 0) {
+
+        if (pendingIndexNotification) {
+            // #websiteStatus is already showing a live "indexing
+            // started" message for this same wait - don't also show a
+            // second, redundant "not indexed yet" message here.
+            block.style.display = "none";
+        } else {
+            block.innerHTML = `
+                <p class="indexed-pages-empty">
+                    <span class="spinner"></span>No pages indexed yet -
+                    this fills in shortly after adding or reindexing.
+                </p>
+            `;
+            block.style.display = "block";
+        }
+
+        if (indexedPagesPollAttempts < INDEXED_PAGES_MAX_POLL_ATTEMPTS) {
+
+            indexedPagesPollAttempts++;
+
+            indexedPagesPollTimeout = setTimeout(
+                () => loadIndexedPages(userId, true),
+                INDEXED_PAGES_POLL_INTERVAL_MS
+            );
+
+        } else {
+            // Gave up waiting - clear the flag so a stale "started"
+            // message doesn't get silently replaced by some unrelated
+            // later load.
+            pendingIndexNotification = false;
+        }
+
+        return;
+    }
+
+    const items = pages.map(page => `
+        <li>
+            <span class="indexed-page-url">${escapeHtml(page.url)}</span>
+            <span class="indexed-page-chunks">
+                ${page.chunk_count} chunk${page.chunk_count === 1 ? "" : "s"}
+            </span>
+        </li>
+    `).join("");
+
+    block.innerHTML = `
+        <details class="help-details">
+            <summary>
+                📄 ${pages.length} page${pages.length === 1 ? "" : "s"}
+                indexed from this site
+            </summary>
+            <ul class="indexed-page-list">${items}</ul>
+        </details>
+    `;
+
+    block.style.display = "block";
+
+    // Pages have actually landed now - replace the earlier "indexing
+    // started" message with a real completion message instead of
+    // leaving the stale "started" text on screen indefinitely.
+    if (pendingIndexNotification) {
+
+        document.getElementById("websiteStatus").innerText =
+            `✅ Indexing completed - ${pages.length} page` +
+            `${pages.length === 1 ? "" : "s"} indexed`;
+
+        pendingIndexNotification = false;
+    }
+}
+
+async function deleteWebsite(url) {
+
+    const userId =
+        document.getElementById("userId").value;
+
+    const response = await fetch(
+        "/website",
+        {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                url: url
+            })
+        }
+    );
+
+    const data = await response.json();
+
+    document.getElementById("websiteStatus").innerText =
+        data.message || data.status;
+
+    loadWebsites();
+}
+
+async function reindexUser(button) {
+
+    const userId =
+        document.getElementById("userId").value;
+
+    const originalLabel =
+        button ? button.innerHTML : null;
+
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = `<span class="spinner"></span>Reindexing...`;
+    }
+
+    setLoadingStatus("websiteStatus", "Reindexing...");
+
+    try {
+
+        const response = await fetch(
+            `/reindex/${userId}`,
+            {
+                method: "POST"
+            }
+        );
+
+        const data = await response.json();
+
+        if (data.status === "success") {
+
+            document.getElementById("websiteStatus").innerText =
+                "✅ Reindex completed";
+
+        } else {
+
+            document.getElementById("websiteStatus").innerText =
+                `❌ ${data.message}`;
+        }
+
+        // A reindex can change which pages are actually indexed (a page
+        // may have been added/removed on the live site since last time),
+        // so refresh the list instead of leaving it showing stale
+        // results from before this reindex ran.
+        await loadIndexedPages(userId);
+
+    } finally {
+
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = originalLabel;
+        }
+
+    }
+
+}
+
+async function saveBusinessSettings(){
+
+    const userId =
+        document.getElementById("userId").value.trim();
+
+    const businessName =
+        document.getElementById("businessName").value.trim();
+
+    const welcomeMessage =
+        document.getElementById("welcomeMessage").value;
+
+    const aiInstructions =
+        document.getElementById("aiInstructions").value;
+
+    const phoneError = validatePhone(userId);
+    if (phoneError) {
+        showFieldError("userId", phoneError);
+        return;
+    }
+    clearFieldError("userId");
+
+    const nameError = validateBusinessName(businessName);
+    if (nameError) {
+        showFieldError("businessName", nameError);
+        return;
+    }
+    clearFieldError("businessName");
+
+    const welcomeError = validateFreeText(
+        welcomeMessage, FIELD_LIMITS.welcomeMessage, "Welcome Message"
+    );
+    if (welcomeError) {
+        alert(welcomeError);
+        return;
+    }
+
+    const instructionsError = validateFreeText(
+        aiInstructions, FIELD_LIMITS.aiInstructions, "AI Instructions"
+    );
+    if (instructionsError) {
+        alert(instructionsError);
+        return;
+    }
+
+    const response =
+        await fetch(
+            "/business-settings",
+            {
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    user_id:userId,
+                    business_name: businessName,
+                    welcome_message: welcomeMessage,
+                    ai_instructions: aiInstructions
+                })
+            }
+        );
+
+    const data =
+        await response.json();
+
+    if (data.status !== "success") {
+        alert(`❌ ${data.message || "Failed to save settings."}`);
+        return;
+    }
+
+    alert("Settings saved");
+}
+
+async function loadBusinessSettings(){
+
+    const userId =
+        document.getElementById("userId").value;
+
+    if(!userId)
+        return;
+
+    const response =
+        await fetch(
+            `/business-settings/${userId}`
+        );
+
+    const data =
+        await response.json();
+
+    const settings =
+        data.settings || {};
+
+    document.getElementById("businessName").value =
+        settings.business_name || "";
+
+    document.getElementById("welcomeMessage").value =
+        settings.welcome_message || "";
+
+    document.getElementById("aiInstructions").value =
+        settings.ai_instructions || "";
+
+    // Setting .value directly (as above) doesn't fire the oninput
+    // handlers that normally keep these counters live, so refresh them
+    // once here after populating the fields from a saved rule/settings.
+    updateCharCounter("businessName");
+    updateCharCounter("welcomeMessage");
+    updateCharCounter("aiInstructions");
+
+}
+
+window.onload = async function () {
+
+    // #userId's value is server-rendered from the logged-in session
+    // (see api/misc.py's /settings route and this file's #userId input
+    // above) - no JS needed to set it here anymore. Was previously
+    // hardcoded to the Sandbox number in this handler, which meant the
+    // field reset to the wrong business's number on every page load
+    // once more than one business existed.
+
+    try { await loadWebsites(); }
+    catch(e){ console.error("Websites", e); }
+
+    try { await loadBusinessSettings(); }
+    catch(e){ console.error("Business Settings", e); }
+
+};
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Follow-ups - Website AI Assistant</title>
+
+    <style>
+
+:root {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #dbeafe;
+  --color-primary-lighter: #eff6ff;
+  --color-blue: #3b82f6;
+
+  --color-gray-50: #f8fafc;
+  --color-gray-100: #e2e8f0;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #cbd5e1;
+  --color-gray-500: #94a3b8;
+  --color-gray-600: #64748b;
+  --color-gray-700: #475569;
+  --color-text-dark: #1e293b;
+  --color-text-darkest: #0f172a;
+
+  --color-danger: #ef4444;
+  --color-danger-dark: #dc2626;
+  --color-danger-light: #fee2e2;
+
+  --color-warning: #f59e0b;
+  --color-warning-dark: #92400e;
+  --color-warning-light: #fef3c7;
+
+  --color-success: #22c55e;
+  --color-success-dark: #166534;
+  --color-success-light: #dcfce7;
+
+  --shadow-sm: rgba(0, 0, 0, 0.05);
+  --shadow-md: rgba(0, 0, 0, 0.08);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+
+  font-family: "Segoe UI", sans-serif;
+
+  background: #f4f7fb;
+
+  color: var(--color-text-dark);
+
+  padding: 14px;
+}
+
+/* HEADER */
+
+.crm-header {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  background: white;
+
+  border-radius: 18px;
+
+  padding: 18px 26px;
+
+  margin-bottom: 20px;
+
+  box-shadow: 0 8px 20px var(--shadow-md);
+}
+
+.crm-brand {
+  display: flex;
+
+  align-items: center;
+
+  gap: 18px;
+}
+
+.logo-circle {
+  width: 56px;
+
+  height: 56px;
+
+  border-radius: 16px;
+
+  background: linear-gradient(135deg, var(--color-primary), var(--color-blue));
+
+  color: white;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  font-size: 28px;
+
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.25);
+}
+
+.crm-title {
+  margin: 0;
+  font-size: 28px;
+  color: var(--color-primary);
+}
+
+.crm-header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.header-link-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  border: none;
+
+  border-radius: 12px;
+
+  background: var(--color-gray-50);
+
+  cursor: pointer;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  color: var(--color-primary);
+
+  text-decoration: none;
+
+  padding: 10px 18px;
+
+  transition: 0.2s;
+}
+
+.header-link-btn:hover {
+  background: var(--color-primary-lighter);
+}
+
+/* FOLLOW-UPS CARD */
+
+.dashboard-card {
+  background: #fff;
+
+  border-radius: 16px;
+
+  padding: 20px;
+
+  box-shadow: 0 8px 24px var(--shadow-md);
+
+  margin: 25px 0;
+}
+
+.dashboard-card h3 {
+  margin-bottom: 18px;
+
+  font-size: 18px;
+
+  color: var(--color-text-dark);
+}
+
+.empty-state {
+  color: var(--color-gray-500);
+
+  text-align: center;
+
+  padding: 30px;
+}
+
+.empty-state p {
+  margin-top: 10px;
+}
+
+.pipeline-summary {
+  display: grid;
+
+  grid-template-columns: repeat(3, 1fr);
+
+  gap: 12px;
+
+  margin-bottom: 18px;
+
+  flex-shrink: 0;
+}
+
+.pipeline-stat {
+  background: var(--color-gray-50);
+
+  border: 1px solid var(--color-gray-100);
+
+  border-radius: 14px;
+
+  padding: 14px;
+
+  text-align: center;
+}
+
+.pipeline-number {
+  font-size: 24px;
+
+  font-weight: 700;
+
+  color: var(--color-primary);
+
+  margin-bottom: 6px;
+}
+
+.pipeline-label {
+  font-size: 12px;
+
+  color: var(--color-gray-600);
+}
+
+.reminder-card {
+  background: #ffffff;
+
+  border-radius: 16px;
+
+  padding: 18px;
+
+  margin-bottom: 16px;
+
+  border-left: 5px solid;
+
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+
+  transition: 0.25s;
+}
+
+.reminder-card:hover {
+  transform: translateY(-2px);
+
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+}
+
+.reminder-card.green {
+  border-color: var(--color-success);
+}
+.reminder-card.yellow {
+  border-color: var(--color-warning);
+}
+.reminder-card.red {
+  border-color: var(--color-danger);
+}
+
+.reminder-header {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: flex-start;
+
+  margin-bottom: 12px;
+}
+
+.reminder-title {
+  font-size: 18px;
+
+  font-weight: 700;
+
+  color: var(--color-text-dark);
+}
+
+.reminder-date {
+  margin-top: 6px;
+
+  font-size: 13px;
+
+  color: var(--color-gray-600);
+}
+
+.reminder-priority {
+  padding: 6px 12px;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+
+  font-weight: 700;
+}
+
+.reminder-priority.green {
+  background: var(--color-success-light);
+
+  color: var(--color-success-dark);
+}
+
+.reminder-priority.yellow {
+  background: var(--color-warning-light);
+
+  color: var(--color-warning-dark);
+}
+
+.reminder-priority.red {
+  background: var(--color-danger-light);
+
+  color: #991b1b;
+}
+
+.reminder-reason {
+  color: var(--color-gray-700);
+
+  line-height: 1.6;
+
+  font-size: 14px;
+}
+
+.reminder-source {
+  color: var(--color-gray-500);
+
+  font-size: 12px;
+
+  margin-top: 6px;
+
+  font-style: italic;
+}
+
+.reminder-footer {
+  display: flex;
+  justify-content: flex-end;
+
+  margin-top: 12px;
+}
+
+.mark-done-btn {
+  border: none;
+
+  border-radius: 8px;
+
+  padding: 6px 14px;
+
+  background: var(--color-success);
+
+  color: white;
+
+  font-weight: 600;
+
+  font-size: 12px;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.mark-done-btn:hover {
+  background: var(--color-success-dark);
+}
+
+.stale-reminders-bar {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 10px;
+
+  margin-bottom: 14px;
+
+  padding: 10px 14px;
+
+  background: #fffbeb;
+
+  border: 1px solid #fde68a;
+
+  border-radius: 10px;
+
+  color: #92400e;
+
+  font-size: 13px;
+}
+
+.stale-reminders-bar button {
+  border: none;
+
+  border-radius: 8px;
+
+  padding: 6px 12px;
+
+  background: var(--color-warning);
+
+  color: white;
+
+  font-weight: 600;
+
+  font-size: 12px;
+
+  cursor: pointer;
+
+  white-space: nowrap;
+}
+
+.stale-reminders-bar button:hover {
+  background: #d97706;
+}
+
+    </style>
+
+</head>
+
+<body>
+
+<!-- ===================================================== -->
+<!-- HEADER -->
+<!-- ===================================================== -->
+
+<div class="crm-header">
+
+    <div class="crm-brand">
+
+        <div class="logo-circle">
+            🔔
+        </div>
+
+        <div>
+
+            <h2 class="crm-title">
+                Follow-ups
+            </h2>
+
+        </div>
+
+    </div>
+
+    <div class="crm-header-right">
+
+        <a href="/" class="header-link-btn" title="Back to Dashboard">
+            ← Dashboard
+        </a>
+
+        <a href="/logout" class="header-link-btn" title="Logout">
+            Logout
+        </a>
+
+    </div>
+
+</div>
+
+<!-- ===================================================== -->
+<!-- UPCOMING FOLLOW-UPS -->
+<!-- ===================================================== -->
+
+<div class="dashboard-card">
+
+    <h3>📅 Upcoming Follow-ups</h3>
+
+    <div id="allRemindersPanel"></div>
+
+</div>
+
+<!-- Which business's reminders to load - see templates/dashboard.html's
+     #userId hidden input for the same pattern. Server-rendered from the
+     session (resolve_dashboard_user_id()), never client-editable in a
+     way that changes what the session is actually allowed to see -
+     api/misc.py's GET /reminders re-checks this against the session on
+     every request regardless of what's sent here. -->
+<input type="hidden" id="userId" value="{{ user_id or '' }}">
+
+<script>
+
+// Escapes text before it's inserted via innerHTML - see
+// templates/dashboard.html's escapeHtml() for the same helper; duplicated
+// here since this page has no shared JS file with that one.
+function escapeHtml(text) {
+    if (text === null || text === undefined) return "";
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+async function loadAllReminders() {
+
+    const userId = document.getElementById("userId").value;
+
+    if (!userId) return;
+
+    const response =
+        await fetch(`/reminders?user_id=${encodeURIComponent(userId)}`);
+
+    const data =
+        await response.json();
+
+    const reminders =
+        data.reminders || [];
+
+    let allRemindersStaleCount = 0;
+
+    try {
+
+        const staleResponse = await fetch(
+            `/reminders/stale?user_id=${encodeURIComponent(userId)}`
+        );
+        const staleData = await staleResponse.json();
+
+        allRemindersStaleCount = (staleData.stale || []).length;
+
+    } catch (e) {
+
+        console.error("Stale reminders check", e);
+
+    }
+
+    reminders.sort((a, b) => {
+
+        const today = new Date().toISOString().split("T")[0];
+
+        function priority(reminder) {
+
+            if (reminder.due_date < today) return 0;   // Overdue
+            if (reminder.due_date === today) return 1; // Today
+            return 2;                                  // Upcoming
+
+        }
+
+        const p1 = priority(a);
+        const p2 = priority(b);
+
+        if (p1 !== p2)
+            return p1 - p2;
+
+        return new Date(a.due_date) - new Date(b.due_date);
+
+    });
+
+    const today =
+        new Date().toISOString().split("T")[0];
+
+    let overdue = 0;
+    let todayCount = 0;
+    let upcoming = 0;
+
+    let html = "";
+
+    if (reminders.length === 0) {
+
+        html = `
+
+        <div class="empty-state">
+
+            <div style="font-size:48px;">📅</div>
+
+            <p>No follow-up reminders.</p>
+
+        </div>
+
+        `;
+
+    } else {
+
+        reminders.forEach(reminder => {
+
+            let cardClass = "green";
+            let badge = "Upcoming";
+
+            if (reminder.due_date < today) {
+
+                cardClass = "red";
+                badge = "Overdue";
+                overdue++;
+
+            }
+            else if (reminder.due_date === today) {
+
+                cardClass = "yellow";
+                badge = "Today";
+                todayCount++;
+
+            }
+            else {
+
+                upcoming++;
+
+            }
+
+            html += `
+
+            <div class="reminder-card ${cardClass}">
+
+                <div class="reminder-header">
+
+                    <div>
+
+                        <div class="reminder-title">
+
+                            📞 ${escapeHtml(reminder.customer_phone)}
+
+                        </div>
+
+                        <div class="reminder-date">
+
+                            📅 ${reminder.due_date}
+
+                        </div>
+
+                    </div>
+
+                    <div class="reminder-priority ${cardClass}">
+
+                        ${badge}
+
+                    </div>
+
+                </div>
+
+                <div class="reminder-reason">
+
+                    ${escapeHtml(reminder.reminder_text)}
+
+                </div>
+
+                <div class="reminder-source">
+
+                    ${
+                        reminder.source_rule_name
+                        ? `🤖 Triggered by: ${escapeHtml(reminder.source_rule_name)}`
+                        : "Source unknown (created before rule tracking)"
+                    }
+
+                </div>
+
+                <div class="reminder-footer">
+
+                    <button
+                        class="mark-done-btn"
+                        onclick="completeReminder(${reminder.id})"
+                    >
+                        ✅ Mark Done
+                    </button>
+
+                </div>
+
+            </div>
+
+            `;
+
+        });
+
+    }
+
+    const staleBar = allRemindersStaleCount > 0
+        ? `
+        <div class="stale-reminders-bar">
+            <span>
+                ⚠️ ${allRemindersStaleCount} reminder(s) no longer match their rule's current setup.
+            </span>
+            <button onclick="clearStaleReminders()">
+                🧹 Clear Stale Reminders
+            </button>
+        </div>
+        `
+        : "";
+
+    document.getElementById("allRemindersPanel").innerHTML = `
+
+        ${staleBar}
+
+        <div class="pipeline-summary">
+
+            <div class="pipeline-stat">
+
+                <div class="pipeline-number">${overdue}</div>
+
+                <div class="pipeline-label">Overdue</div>
+
+            </div>
+
+            <div class="pipeline-stat">
+
+                <div class="pipeline-number">${todayCount}</div>
+
+                <div class="pipeline-label">Today</div>
+
+            </div>
+
+            <div class="pipeline-stat">
+
+                <div class="pipeline-number">${upcoming}</div>
+
+                <div class="pipeline-label">Upcoming</div>
+
+            </div>
+
+        </div>
+
+        ${html}
+
+    `;
+}
+
+async function completeReminder(reminderId) {
+
+    try {
+
+        await fetch(`/reminders/${reminderId}/complete`, {
+            method: "POST"
+        });
+
+        await loadAllReminders();
+
+    } catch (e) {
+
+        console.error("Complete reminder", e);
+        alert("Failed to mark reminder done.");
+
+    }
+
+}
+
+async function clearStaleReminders() {
+
+    if (!confirm(
+        "Remove every reminder whose rule has since been deleted or " +
+        "edited to say something different? This can't be undone."
+    )) {
+        return;
+    }
+
+    try {
+
+        const userId = document.getElementById("userId").value;
+
+        const response = await fetch(
+            `/reminders/stale?user_id=${encodeURIComponent(userId)}`,
+            { method: "DELETE" }
+        );
+
+        const data = await response.json();
+
+        alert(`✅ Removed ${data.deleted} stale reminder(s).`);
+
+        await loadAllReminders();
+
+    } catch (e) {
+
+        console.error("Clear stale reminders", e);
+        alert("Failed to clear stale reminders.");
+
+    }
+
+}
+
+window.onload = async function () {
+
+    try { await loadAllReminders(); }
+    catch(e){ console.error("All Reminders", e); }
+
+};
+
+</script>
+
+</body>
+</html>
