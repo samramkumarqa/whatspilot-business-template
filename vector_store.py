@@ -9,25 +9,48 @@ logger = logging.getLogger(__name__)
 _embeddings = None
 
 
+class _FastEmbedEmbeddings:
+    """
+    Minimal LangChain Embeddings-compatible wrapper around fastembed's
+    TextEmbedding - implements just the two methods langchain_chroma.Chroma
+    actually calls (embed_documents/embed_query).
+
+    Replaces langchain_huggingface.HuggingFaceEmbeddings, which pulls in
+    sentence-transformers -> torch (transitively ~1-2GB installed, several
+    hundred MB just to import). fastembed runs the *same* model
+    (sentence-transformers/all-MiniLM-L6-v2 - see fastembed's supported-
+    models list, 384-dim, ~90MB) via ONNX Runtime instead of PyTorch, so
+    embedding quality is unchanged, but the app no longer needs torch,
+    transformers, or sentence-transformers at all. This is what was
+    OOM-ing every business-portal deployment on Render's 512MB free tier
+    (see whatspilot-admin-repo's task history, "post-boot runtime OOM") -
+    the earlier fix (deferring the *import* to first use, below) wasn't
+    enough on its own, because the underlying torch/transformers stack is
+    heavy even just sitting imported in memory once anything touches it.
+    """
+
+    def __init__(self, model_name="sentence-transformers/all-MiniLM-L6-v2"):
+        from fastembed import TextEmbedding
+        self._model = TextEmbedding(model_name=model_name)
+
+    def embed_documents(self, texts):
+        return [vec.tolist() for vec in self._model.embed(texts)]
+
+    def embed_query(self, text):
+        return next(self._model.embed([text])).tolist()
+
 
 def get_embeddings():
     """
-    langchain_huggingface pulls in sentence-transformers -> torch, which
-    alone commonly needs several hundred MB just to import - deferring
-    the import to here (instead of module level) means a plain app boot
+    Deferred to first use (instead of module level) so a plain app boot
     (auth, dashboard, webhook receiving, CRM, automation - everything
-    that doesn't touch the website-RAG feature) doesn't pay that cost.
-    This matters concretely on Render's free/Starter tier (512MB RAM):
-    the app OOM'd on startup before this change, purely from importing
-    main.py's dependency chain, before a single request was served.
+    that doesn't touch the website-RAG feature) doesn't pay the cost of
+    loading the embedding model at all.
     """
 
     global _embeddings
     if _embeddings is None:
-        from langchain_huggingface import HuggingFaceEmbeddings
-        _embeddings = HuggingFaceEmbeddings(
-            model_name="all-MiniLM-L6-v2"
-        )
+        _embeddings = _FastEmbedEmbeddings()
     return _embeddings
 
 
