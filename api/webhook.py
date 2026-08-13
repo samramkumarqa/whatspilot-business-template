@@ -63,10 +63,17 @@ async def receive_message(
 ):
     signature = request.headers.get("X-Twilio-Signature")
 
-    form_data = {
-        "From": From,
-        "Body": Body
-    }
+    # Twilio's signature is an HMAC over the webhook URL plus EVERY form
+    # field it posted (To, MessageSid, AccountSid, ProfileName, WaId,
+    # NumMedia, etc. - not just From/Body). Validating against a
+    # hand-picked subset of fields recomputes a different signature than
+    # Twilio sent, so validate() would fail for every real request - only
+    # ever worked before because DEBUG skipped this branch entirely.
+    # request.form() is safe to call again here even though the Form(...)
+    # params above already triggered a parse - Starlette caches the
+    # parsed body on the request instead of re-reading the stream.
+    form = await request.form()
+    form_data = dict(form)
 
     # -----------------------------
     # Validate Twilio
