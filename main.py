@@ -4,7 +4,6 @@ import os
 
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
-from twilio.request_validator import RequestValidator
 
 from middleware import AdminAuthMiddleware
 from api import dashboard
@@ -26,7 +25,6 @@ from api.webhook import router as webhook_router
 from api.ai import router as ai_router
 from api.settings import router as settings_router
 from api.website import router as website_router
-from api.chat import router as chat_router
 from api.misc import router as misc_router
 from api.customer import router as customer_router
 from automation.service import initialize_scheduler
@@ -41,8 +39,6 @@ from api.auth import router as auth_router
 # ==========================================================
 from config import (
     DEBUG,
-    TWILIO_ACCOUNT_SID,
-    TWILIO_AUTH_TOKEN,
     SESSION_SECRET_KEY,
     BUSINESS_ID,
 )
@@ -97,20 +93,6 @@ async def startup():
     initialize_scheduler()
 
 
-LEAD_PRIORITY = {
-    "New": 1,
-    "Interested": 2,
-    "Qualified": 3,
-    "Proposal Sent": 4,
-    "Closed Won": 5,
-    "Closed Lost": 5
-
-}
-
-
-
-validator = RequestValidator(TWILIO_AUTH_TOKEN)
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -122,7 +104,6 @@ app.include_router(customer_router)
 app.include_router(ai_router)
 app.include_router(settings_router)
 app.include_router(website_router)
-app.include_router(chat_router)
 app.include_router(misc_router)
 app.include_router(dashboard_router)
 app.include_router(automation_router)

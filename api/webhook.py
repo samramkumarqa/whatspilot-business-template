@@ -396,10 +396,36 @@ async def receive_message(
         # -----------------------------
         # Send WhatsApp Reply
         # -----------------------------
-        await send_message(
-            from_number,
-            reply
-        )
+        try:
+            await send_message(
+                from_number,
+                reply
+            )
+        except Exception as e:
+            # The reply was already saved to conversation history and fed
+            # into refresh_customer_intelligence() above, so without this
+            # the rest of the pipeline behaves as if the customer actually
+            # received it. A Twilio-side delivery failure (bad number,
+            # opted out, rate limited, etc.) would otherwise leave zero
+            # visible trace - surface it as a distinct log line plus a
+            # Customer Timeline entry so a team member notices and can
+            # follow up manually.
+            logger.exception(
+                f"Failed to deliver reply to {from_number}: {e}"
+            )
+
+            await run_in_threadpool(
+                add_activity,
+                from_number,
+                "Delivery",
+                "Failed to send AI reply",
+                str(e)[:500]
+            )
+
+            return {
+                "status": "error",
+                "message": f"Reply generated but delivery failed: {e}"
+            }
 
         return {
             "status": "success"

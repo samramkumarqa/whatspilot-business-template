@@ -224,8 +224,12 @@ def ask_manager(user_id, question):
     #
     # Default
     #
-    dashboard = get_dashboard(user_id)
-
+    # `dashboard` was already fetched once at the top of this function -
+    # get_dashboard() aggregates lead scores, funnel, opportunities,
+    # forecast, reminders, customer health, alerts, and metrics in one
+    # call, so re-running it here for the fallback LLM path was a second
+    # full dashboard computation for every question that didn't match one
+    # of the keyword branches above.
     prompt = f"""
     You are an experienced Sales Director.
 

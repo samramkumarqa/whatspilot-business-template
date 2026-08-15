@@ -3,7 +3,7 @@ from database.db import (
     get_conversation_connection
 )
 from datetime import datetime
-from crm.lead_manager import get_lead
+from crm.lead_manager import get_lead, DEFAULT_LEAD
 from crm.customer_mapping import get_business_id
 
 CRM_DB = "data/app.db"
@@ -72,6 +72,31 @@ def get_last_seen_days(
         datetime.now() - last_seen
     ).days
 
+def _days_since(raw_timestamp):
+    """
+    Shared date-parsing used by both get_last_seen_days() (single
+    customer) and get_customer_health_dashboard()'s batched path below -
+    same fallback chain (ISO format, then sqlite/postgres-style
+    "%Y-%m-%d %H:%M:%S", then a 999-day "never seen" sentinel) either way.
+    """
+
+    if not raw_timestamp:
+        return 999
+
+    try:
+        last_seen = datetime.fromisoformat(raw_timestamp)
+    except Exception:
+        try:
+            last_seen = datetime.strptime(
+                raw_timestamp,
+                "%Y-%m-%d %H:%M:%S"
+            )
+        except Exception:
+            return 999
+
+    return (datetime.now() - last_seen).days
+
+
 def get_reminder_stats(
     customer_phone
 ):
@@ -109,8 +134,17 @@ def get_reminder_stats(
 
 def get_customer_health_dashboard(user_id):
     """
-    Calculate customer health dashboard
-    for all customers belonging to one business.
+    Calculate customer health dashboard for all customers belonging to one
+    business.
+
+    Previously did 1 query to resolve business_id PLUS 3 more queries
+    (lead, reminder stats, last-seen) PER CUSTOMER - so a business with
+    200 customers ran ~600+ round trips on every dashboard/analytics
+    load, and get_business_id(user_id) alone was re-resolved 200 times
+    despite always returning the same value for this call. Rewritten to
+    resolve business_id once and fetch leads/reminders/last-seen each in
+    a single batched query keyed by customer_phone, dropping this to a
+    small constant number of round trips regardless of customer count.
     """
 
     conn = get_crm_connection()
@@ -127,17 +161,17 @@ def get_customer_health_dashboard(user_id):
         (user_id,)
     ).fetchone()
 
+    dashboard = {
+        "healthy": 0,
+        "good": 0,
+        "needs_attention": 0,
+        "at_risk": 0,
+        "average_score": 0
+    }
+
     if not row:
-
         conn.close()
-
-        return {
-            "healthy": 0,
-            "good": 0,
-            "needs_attention": 0,
-            "at_risk": 0,
-            "average_score": 0
-        }
+        return dashboard
 
     business_phone = row["whatsapp_number"]
 
@@ -145,7 +179,7 @@ def get_customer_health_dashboard(user_id):
     # Get all customers
     #
 
-    customers = conn.execute(
+    customer_rows = conn.execute(
         """
         SELECT customer_phone
         FROM customer_mapping
@@ -154,42 +188,107 @@ def get_customer_health_dashboard(user_id):
         (business_phone,)
     ).fetchall()
 
+    customer_phones = [c["customer_phone"] for c in customer_rows]
+
+    if not customer_phones:
+        conn.close()
+        return dashboard
+
+    placeholders = ",".join(["?"] * len(customer_phones))
+
+    #
+    # Batch: every customer's lead row in one query
+    #
+    lead_rows = conn.execute(
+        f"""
+        SELECT *
+        FROM leads
+        WHERE customer_phone IN ({placeholders})
+        """,
+        tuple(customer_phones)
+    ).fetchall()
+
+    leads_by_phone = {
+        lead_row["customer_phone"]: dict(lead_row)
+        for lead_row in lead_rows
+    }
+
+    #
+    # Batch: every customer's overdue reminder count in one query
+    #
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    reminder_rows = conn.execute(
+        f"""
+        SELECT customer_phone, COUNT(*) AS overdue
+        FROM reminders
+        WHERE customer_phone IN ({placeholders})
+        AND completed=0
+        AND due_date < ?
+        GROUP BY customer_phone
+        """,
+        tuple(customer_phones) + (today,)
+    ).fetchall()
+
+    overdue_by_phone = {
+        r["customer_phone"]: r["overdue"]
+        for r in reminder_rows
+    }
+
     conn.close()
 
-    dashboard = {
+    #
+    # Batch: every customer's last-seen conversation timestamp, resolved
+    # via ONE business_id lookup (instead of once per customer) plus ONE
+    # grouped MAX(created_at) query.
+    #
+    business_id = get_business_id(user_id)
 
-        "healthy": 0,
+    last_seen_by_phone = {}
 
-        "good": 0,
+    if business_id:
 
-        "needs_attention": 0,
+        conv_conn = get_conversation_connection()
 
-        "at_risk": 0,
+        conversation_ids = [
+            f"{business_id}:{phone}" for phone in customer_phones
+        ]
 
-        "average_score": 0
-    }
+        conv_rows = conv_conn.execute(
+            f"""
+            SELECT phone, MAX(created_at) AS last_seen
+            FROM conversations
+            WHERE phone IN ({placeholders})
+            GROUP BY phone
+            """,
+            tuple(conversation_ids)
+        ).fetchall()
+
+        conv_conn.close()
+
+        prefix = f"{business_id}:"
+
+        for r in conv_rows:
+            phone = r["phone"]
+            if phone.startswith(prefix):
+                last_seen_by_phone[phone[len(prefix):]] = r["last_seen"]
 
     scores = []
 
-    for customer in customers:
+    for customer_phone in customer_phones:
 
-        customer_phone = customer["customer_phone"]
+        lead = leads_by_phone.get(customer_phone)
 
-        lead = get_lead(customer_phone)
+        if lead is None:
+            lead = DEFAULT_LEAD.copy()
+            lead["customer_phone"] = customer_phone
 
-        #
-        # Placeholder values
-        # (We'll replace these later with live reminder
-        # and conversation statistics.)
-        #
+        reminder_stats = {
+            "overdue": overdue_by_phone.get(customer_phone, 0)
+        }
 
-        reminder_stats = get_reminder_stats(
-            customer_phone
-        )
-
-        last_seen_days = get_last_seen_days(
-            user_id,
-            customer_phone
+        last_seen_days = _days_since(
+            last_seen_by_phone.get(customer_phone)
         )
 
         health = calculate_health_score(

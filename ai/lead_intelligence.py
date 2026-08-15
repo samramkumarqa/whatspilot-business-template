@@ -1,5 +1,7 @@
 
 
+from fastapi.concurrency import run_in_threadpool
+
 from llm import ask_llm
 from crm.tag_manager import (
     save_tags,
@@ -375,8 +377,30 @@ async def refresh_customer_intelligence(
     customer_phone
 ):
     """
-    Analyse the full conversation and update CRM.
+    Analyse the full conversation and update CRM. Thin async wrapper -
+    see _refresh_customer_intelligence_sync() for the actual work, which
+    is entirely synchronous (a Groq LLM call plus several DB round
+    trips) and needs to run in a worker thread rather than block the
+    event loop. This is awaited directly from api/webhook.py, on the
+    hot path that has to respond to Twilio quickly for every single
+    incoming WhatsApp message - without run_in_threadpool here, that
+    LLM call + DB writes would stall every other concurrent request
+    (this deployment's dashboard, any other in-flight webhook) for the
+    full duration, the same class of bug this codebase already fixed
+    once in auth.py (see this project's optimization history).
     """
+
+    return await run_in_threadpool(
+        _refresh_customer_intelligence_sync,
+        user_id,
+        customer_phone
+    )
+
+
+def _refresh_customer_intelligence_sync(
+    user_id,
+    customer_phone
+):
 
     messages = get_conversation(
         user_id,

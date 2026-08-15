@@ -122,3 +122,8 @@ def get_last_customer_update(user_id):
     ).fetchone()
 
     conn.close()
+
+    # Was missing entirely - every caller (api/settings.py's
+    # GET /customers-last/{user_id}) got an implicit None back regardless
+    # of whether any conversations existed.
+    return row[0] if row else None
