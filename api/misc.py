@@ -97,9 +97,30 @@ async def reminders(user_id: str, request: Request):
     }
 
 @router.get("/lead-categories")
-async def lead_categories():
+async def lead_categories(user_id: str, request: Request):
+    """
+    BUG FIX: this previously took no user_id/authorization at all and
+    called get_lead_categories() with no business_phone, returning every
+    business's customer phone numbers, lead status, and lead score to
+    any logged-in business owner - same class of cross-tenant leak
+    GET /reminders above was already fixed for (see that route's
+    docstring). Not currently called from any template, but it was a
+    live, reachable, authenticated-but-unscoped endpoint.
+    """
 
-    categories = await run_in_threadpool(get_lead_categories)
+    enforce_tenant_access(request, user_id)
+
+    business_phone = await run_in_threadpool(get_business_phone_by_user, user_id)
+
+    if not business_phone:
+        return {
+            "status": "success",
+            "hot": [],
+            "warm": [],
+            "cold": []
+        }
+
+    categories = await run_in_threadpool(get_lead_categories, business_phone)
 
     return {
         "status": "success",

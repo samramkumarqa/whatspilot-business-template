@@ -111,6 +111,37 @@ def test_get_lead_categories_buckets_by_score(isolated_db):
     assert "+1000000003" in cold_phones
 
 
+def test_get_lead_categories_scoped_to_one_business_excludes_the_other(isolated_db):
+    """
+    Regression test for a cross-tenant leak: api/misc.py's GET
+    /lead-categories used to call get_lead_categories() with no
+    business_phone at all, returning every business's leads to any
+    logged-in business owner. See get_lead_categories()'s docstring for
+    the fix - business_phone now scopes via a customer_mapping JOIN, the
+    same pattern reminder_manager.get_reminders() already used.
+    """
+
+    save_customer_number("u1", "+10000000001", "bizA")
+    save_customer_number("u2", "+10000000002", "bizB")
+
+    save_mapping("+91100000001", "+10000000001", "Alice")
+    save_mapping("+91100000002", "+10000000002", "Bob")
+
+    update_lead("+91100000001", "Proposal Sent", "", confidence=100, reason="", updated_by="Manual")
+    update_lead("+91100000002", "Proposal Sent", "", confidence=100, reason="", updated_by="Manual")
+
+    biz_a_categories = get_lead_categories("+10000000001")
+
+    biz_a_phones = {
+        lead["customer_phone"]
+        for bucket in biz_a_categories.values()
+        for lead in bucket
+    }
+
+    assert "+91100000001" in biz_a_phones
+    assert "+91100000002" not in biz_a_phones
+
+
 def _full_analysis(**overrides):
     # A fully-populated ai/lead_intelligence.py analyse_conversation()
     # result - update_lead_intelligence() indexes into this dict directly

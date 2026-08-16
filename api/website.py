@@ -75,16 +75,14 @@ async def reindex(user_id: str, request: Request):
         }
 
 
-@router.get("/websites")
-async def websites():
-
-    sites = await run_in_threadpool(get_websites)
-
-    return {
-        "status": "success",
-        "count": len(sites),
-        "websites": sorted(sites)
-    }
+# BUG FIX: an unscoped GET /websites route used to live here, calling
+# get_websites() with no user_id - website_manager.get_websites(user_id)
+# has no default, so every call raised an unhandled 500
+# (TypeError: missing 1 required positional argument). Nothing in the
+# templates ever called it (only GET /websites/{user_id} below is used -
+# see templates/settings.html), so it was dead as well as broken.
+# Removed rather than fixed in place, since the parameterized route
+# below already covers the real use case correctly.
 
 
 @router.post("/website")

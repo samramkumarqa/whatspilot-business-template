@@ -352,17 +352,44 @@ def get_lead_timeline(customer_phone):
         for row in rows
     ]
 
-def get_lead_categories():
+def get_lead_categories(business_phone=None):
+    """
+    business_phone=None (the default) returns leads for every business -
+    unsafe for any HTTP-facing caller, since this is a shared Postgres
+    database and every business's leads live in the same `leads` table.
+    api/misc.py's GET /lead-categories MUST pass a business_phone (same
+    reasoning as reminder_manager.get_reminders()) - leaving it unset
+    there previously let any logged-in business owner see every other
+    business's customer phone numbers and lead scores.
+    """
 
     conn = get_crm_connection()
 
-    cursor = conn.execute("""
-        SELECT
-            customer_phone,
-            status,
-            lead_score
-        FROM leads
-    """)
+    if business_phone is None:
+
+        cursor = conn.execute("""
+            SELECT
+                customer_phone,
+                status,
+                lead_score
+            FROM leads
+        """)
+
+    else:
+
+        cursor = conn.execute(
+            """
+            SELECT
+                l.customer_phone,
+                l.status,
+                l.lead_score
+            FROM leads l
+            INNER JOIN customer_mapping cm
+                ON l.customer_phone = cm.customer_phone
+            WHERE cm.business_phone = ?
+            """,
+            (business_phone,)
+        )
 
     rows = cursor.fetchall()
 
