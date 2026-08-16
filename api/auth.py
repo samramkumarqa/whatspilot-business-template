@@ -200,3 +200,11 @@ async def business_login_verify_submit(request: Request):
     request.session["business_id"] = business["business_id"]
 
     return RedirectResponse(url="/", status_code=303)
+
+
+@router.get("/logout")
+async def logout(request: Request):
+
+    request.session.clear()
+
+    return RedirectResponse(url="/business-login", status_code=303)

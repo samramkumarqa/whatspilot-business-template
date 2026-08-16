@@ -16,6 +16,7 @@ from starlette.responses import RedirectResponse, JSONResponse
 EXEMPT_PATHS = {
     "/business-login",
     "/business-login/verify",
+    "/logout",
     "/webhook",
     "/health",
 }

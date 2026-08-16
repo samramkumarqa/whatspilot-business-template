@@ -358,6 +358,35 @@ def test_business_login_verify_correct_code_grants_access(client, business, monk
     assert protected.status_code == 200
 
 
+def test_logout_clears_the_session(client, business, monkeypatch):
+    monkeypatch.setattr("api.auth.send_otp", lambda phone, channel=None: True)
+    monkeypatch.setattr("api.auth.check_otp", lambda phone, code: True)
+
+    client.post("/business-login", data={"phone": business["phone"]})
+    client.post("/business-login/verify", data={"code": "123456"})
+
+    protected = client.get("/protected-page")
+    assert protected.status_code == 200  # confirms the session was actually live
+
+    logout_response = client.get("/logout", follow_redirects=False)
+    assert logout_response.status_code == 303
+    assert logout_response.headers["location"] == "/business-login"
+
+    protected_after_logout = client.get(
+        "/protected-page", headers={"accept": "application/json"}
+    )
+    assert protected_after_logout.status_code == 401
+
+
+def test_logout_is_reachable_without_a_session(client):
+    # /logout has to be in middleware.py's EXEMPT_PATHS - an already-
+    # logged-out user (or one whose session expired) clicking a stale
+    # logout link must not get redirected back into a login loop.
+    response = client.get("/logout", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/business-login"
+
+
 def test_business_login_also_works_with_the_business_whatsapp_number(client, business, monkeypatch):
     # A business isn't required to have a separate personal
     # owner_whatsapp_number - logging in with the bot's own WhatsApp
