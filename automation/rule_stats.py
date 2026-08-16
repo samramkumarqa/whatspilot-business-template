@@ -18,7 +18,7 @@ grow, but the table stays proportional to (rules x customers who ever
 matched), not to elapsed time.
 """
 
-from database.db import get_conversation_connection, get_crm_connection
+from database.db import get_conversation_connection, get_crm_connection, create_index_if_missing
 
 
 def init_rule_executions():
@@ -58,14 +58,14 @@ def init_rule_executions():
             "ALTER TABLE automation_rule_executions ADD COLUMN business_id TEXT"
         )
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_rule_executions_rule_id "
-        "ON automation_rule_executions(rule_id)"
+    create_index_if_missing(
+        conn, "idx_rule_executions_rule_id",
+        "CREATE INDEX idx_rule_executions_rule_id ON automation_rule_executions(rule_id)"
     )
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_rule_executions_business_id "
-        "ON automation_rule_executions(business_id)"
+    create_index_if_missing(
+        conn, "idx_rule_executions_business_id",
+        "CREATE INDEX idx_rule_executions_business_id ON automation_rule_executions(business_id)"
     )
 
     conn.commit()

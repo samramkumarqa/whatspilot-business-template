@@ -249,6 +249,46 @@ def fetchall_conversation(query, params=()):
     return rows
 
 
+def create_index_if_missing(conn, index_name, create_sql):
+    """
+    Guards a CREATE INDEX statement with an explicit existence check
+    instead of relying on "CREATE INDEX IF NOT EXISTS" alone.
+
+    That distinction matters once BUSINESS_PORTAL_DATABASE_URL (see
+    whatspilot-admin-repo/provisioning/setup_business_portal_role.py) is
+    in use: unlike CREATE TABLE IF NOT EXISTS (a true no-op when the
+    table already exists, no permission check triggered), Postgres still
+    requires the caller to *own* the underlying table for CREATE INDEX
+    IF NOT EXISTS even when the index is already there and nothing is
+    actually going to be created - so every init_*() function calling it
+    unconditionally on every boot would fail every single time under the
+    restricted, non-owning whatspilot_business_portal role with "must be
+    owner of table ...", even for an index that's existed for months.
+    (Confirmed in production: this crash-looped a business-portal
+    deployment immediately after BUSINESS_PORTAL_DATABASE_URL was wired
+    up, on a table/index pair that already existed from before the
+    restricted role existed.)
+
+    Checking pg_indexes first and only issuing CREATE INDEX when it's
+    genuinely missing avoids the permission check entirely once the
+    index already exists, matching the column-existence-check pattern
+    already used elsewhere in this codebase for ALTER TABLE ADD COLUMN.
+    A brand new table the restricted role just created itself (and
+    therefore owns) is unaffected either way - CREATE INDEX succeeds for
+    it the first time, and every boot after that skips it via this same
+    check.
+    """
+
+    exists = conn.execute(
+        "SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() "
+        "AND indexname = ?",
+        (index_name,)
+    ).fetchone()
+
+    if not exists:
+        conn.execute(create_sql)
+
+
 def commit_and_close(conn):
     conn.commit()
     conn.close()

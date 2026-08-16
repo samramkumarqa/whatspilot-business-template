@@ -1,7 +1,7 @@
 import json
 
 from datetime import datetime, timedelta
-from database.db import get_crm_connection, get_conversation_connection
+from database.db import get_crm_connection, get_conversation_connection, create_index_if_missing
 
 def init_reminders():
 
@@ -49,9 +49,9 @@ def init_reminders():
             "ALTER TABLE reminders ADD COLUMN source_rule_name TEXT"
         )
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_reminders_customer_phone "
-        "ON reminders(customer_phone)"
+    create_index_if_missing(
+        conn, "idx_reminders_customer_phone",
+        "CREATE INDEX idx_reminders_customer_phone ON reminders(customer_phone)"
     )
 
     conn.commit()

@@ -1,4 +1,4 @@
-from database.db import get_crm_connection
+from database.db import get_crm_connection, create_index_if_missing
 
 def init_customer_mapping():
 
@@ -72,9 +72,9 @@ def init_customer_mapping():
         )
     """)
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_customer_mapping_business_phone "
-        "ON customer_mapping(business_phone)"
+    create_index_if_missing(
+        conn, "idx_customer_mapping_business_phone",
+        "CREATE INDEX idx_customer_mapping_business_phone ON customer_mapping(business_phone)"
     )
 
     # customer_numbers is queried by whatsapp_number on every incoming
@@ -82,13 +82,13 @@ def init_customer_mapping():
     # OR owner_whatsapp_number on every business-login attempt
     # (get_business_by_login_number()) - both hot paths, and both were
     # running full table scans with no index to support them.
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_customer_numbers_whatsapp_number "
-        "ON customer_numbers(whatsapp_number)"
+    create_index_if_missing(
+        conn, "idx_customer_numbers_whatsapp_number",
+        "CREATE INDEX idx_customer_numbers_whatsapp_number ON customer_numbers(whatsapp_number)"
     )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_customer_numbers_owner_whatsapp_number "
-        "ON customer_numbers(owner_whatsapp_number)"
+    create_index_if_missing(
+        conn, "idx_customer_numbers_owner_whatsapp_number",
+        "CREATE INDEX idx_customer_numbers_owner_whatsapp_number ON customer_numbers(owner_whatsapp_number)"
     )
 
     # customer_name existed in a schema created before this column was

@@ -1,4 +1,4 @@
-from database.db import get_crm_connection
+from database.db import get_crm_connection, create_index_if_missing
 
 
 def init_followups():
@@ -23,9 +23,9 @@ def init_followups():
     )
     """)
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_ai_followups_customer_phone "
-        "ON ai_followups(customer_phone)"
+    create_index_if_missing(
+        conn, "idx_ai_followups_customer_phone",
+        "CREATE INDEX idx_ai_followups_customer_phone ON ai_followups(customer_phone)"
     )
 
     conn.commit()

@@ -1,4 +1,4 @@
-from database.db import get_crm_connection
+from database.db import get_crm_connection, create_index_if_missing
 
 DB_FILE = "data/app.db"
 
@@ -24,9 +24,9 @@ def init_activity():
     )
     """)
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_ai_activity_customer_phone "
-        "ON ai_activity(customer_phone)"
+    create_index_if_missing(
+        conn, "idx_ai_activity_customer_phone",
+        "CREATE INDEX idx_ai_activity_customer_phone ON ai_activity(customer_phone)"
     )
 
     conn.commit()

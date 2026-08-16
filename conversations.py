@@ -1,4 +1,4 @@
-from database.db import get_conversation_connection
+from database.db import get_conversation_connection, create_index_if_missing
 
 
 def get_connection():
@@ -40,9 +40,9 @@ def init_db():
             "ALTER TABLE conversations ADD COLUMN sender TEXT"
         )
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_conversations_phone "
-        "ON conversations(phone)"
+    create_index_if_missing(
+        conn, "idx_conversations_phone",
+        "CREATE INDEX idx_conversations_phone ON conversations(phone)"
     )
 
     conn.commit()

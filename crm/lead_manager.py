@@ -1,5 +1,5 @@
 from ai.lead_ai import calculate_lead_score
-from database.db import get_crm_connection
+from database.db import get_crm_connection, create_index_if_missing
 
 
 # Terminal pipeline states - once a deal is here, an automated update
@@ -145,14 +145,14 @@ def init_leads():
     )
     """)
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_opportunities_customer_phone "
-        "ON opportunities(customer_phone)"
+    create_index_if_missing(
+        conn, "idx_opportunities_customer_phone",
+        "CREATE INDEX idx_opportunities_customer_phone ON opportunities(customer_phone)"
     )
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_lead_history_customer_phone "
-        "ON lead_history(customer_phone)"
+    create_index_if_missing(
+        conn, "idx_lead_history_customer_phone",
+        "CREATE INDEX idx_lead_history_customer_phone ON lead_history(customer_phone)"
     )
 
     conn.commit()
