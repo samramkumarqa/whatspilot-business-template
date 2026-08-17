@@ -171,8 +171,9 @@ def get_customer_stats(user_id):
                 ai_paused
             FROM leads
             WHERE customer_phone IN ({placeholders})
+            AND business_id = ?
             """,
-            customer_phones
+            customer_phones + [business_id]
         )
 
         lead_by_phone = {
@@ -479,8 +480,9 @@ def get_dashboard_metrics(user_id):
             FROM opportunities
             WHERE status = 'Open'
             AND customer_phone IN ({placeholders})
+            AND business_id = ?
             """,
-            customer_phones
+            customer_phones + [business_id]
         ).fetchone()[0]
 
         crm_conn.close()

@@ -111,15 +111,20 @@ def test_get_lead_categories_buckets_by_score(isolated_db):
     assert "+1000000003" in cold_phones
 
 
-def test_get_lead_categories_scoped_to_one_business_excludes_the_other(isolated_db):
+def test_get_lead_categories_scoped_to_one_business_excludes_the_other(isolated_db, monkeypatch):
     """
     Regression test for a cross-tenant leak: api/misc.py's GET
-    /lead-categories used to call get_lead_categories() with no
-    business_phone at all, returning every business's leads to any
-    logged-in business owner. See get_lead_categories()'s docstring for
-    the fix - business_phone now scopes via a customer_mapping JOIN, the
-    same pattern reminder_manager.get_reminders() already used.
+    /lead-categories used to call get_lead_categories() with no business
+    scoping at all, returning every business's leads to any logged-in
+    business owner. get_lead_categories() now filters on
+    business_id = config.BUSINESS_ID directly (this deployment's own,
+    authoritative, write-time-stamped scope) - see its docstring in
+    crm/lead_manager.py and migrations/add_business_id_to_crm_tables.py's
+    module docstring for why that's the safe scope, not a join through
+    customer_mapping's business_phone.
     """
+
+    import config
 
     save_customer_number("u1", "+10000000001", "bizA")
     save_customer_number("u2", "+10000000002", "bizB")
@@ -127,10 +132,14 @@ def test_get_lead_categories_scoped_to_one_business_excludes_the_other(isolated_
     save_mapping("+91100000001", "+10000000001", "Alice")
     save_mapping("+91100000002", "+10000000002", "Bob")
 
+    monkeypatch.setattr(config, "BUSINESS_ID", "bizA")
     update_lead("+91100000001", "Proposal Sent", "", confidence=100, reason="", updated_by="Manual")
+
+    monkeypatch.setattr(config, "BUSINESS_ID", "bizB")
     update_lead("+91100000002", "Proposal Sent", "", confidence=100, reason="", updated_by="Manual")
 
-    biz_a_categories = get_lead_categories("+10000000001")
+    monkeypatch.setattr(config, "BUSINESS_ID", "bizA")
+    biz_a_categories = get_lead_categories()
 
     biz_a_phones = {
         lead["customer_phone"]

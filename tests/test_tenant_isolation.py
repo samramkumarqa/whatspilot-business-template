@@ -91,8 +91,16 @@ def test_runner_only_fires_this_deployments_own_business_rules(isolated_db, monk
 
     # "Closed Won" + confidence=90 -> lead_score 96 (see
     # ai/lead_ai.py's calculate_lead_score), comfortably matching both
-    # rules' lead_score >= 80 condition.
+    # rules' lead_score >= 80 condition. update_lead() stamps whichever
+    # business_id config.BUSINESS_ID currently points at (see
+    # crm/lead_manager.py), so each business's own lead has to be written
+    # while BUSINESS_ID is set to that business's own id - get_customer_stats()
+    # (which evaluate_rule() reads through) now filters leads by business_id,
+    # not just by which conversation the customer_phone came from.
+    monkeypatch.setattr(config, "BUSINESS_ID", "bizA")
     update_lead("+91100000001", "Closed Won", "", confidence=90)
+
+    monkeypatch.setattr(config, "BUSINESS_ID", "bizB")
     update_lead("+91100000002", "Closed Won", "", confidence=90)
 
     rule_a = mgr_create_rule(_rule_data("Biz A Rule"), "bizA")
@@ -130,7 +138,9 @@ def test_runner_only_fires_this_deployments_own_business_rules(isolated_db, monk
 # api/dashboard.py - dashboard_analytics() business scoping
 # ---------------------------------------------------------------------
 
-def test_dashboard_analytics_does_not_leak_leads_across_businesses(isolated_db):
+def test_dashboard_analytics_does_not_leak_leads_across_businesses(isolated_db, monkeypatch):
+
+    import config
 
     _register_business("u1", "bizA", "+10000000001")
     _register_business("u2", "bizB", "+10000000002")
@@ -138,7 +148,15 @@ def test_dashboard_analytics_does_not_leak_leads_across_businesses(isolated_db):
     _attach_customer("+91100000001", "+10000000001", "bizA", "Alice")
     _attach_customer("+91100000002", "+10000000002", "bizB", "Bob")
 
+    # update_lead() stamps whichever business_id config.BUSINESS_ID
+    # currently points at (see crm/lead_manager.py) - each business's
+    # write has to happen while BUSINESS_ID is set to that business's
+    # own id, same as a real deployment would only ever write its own
+    # business_id.
+    monkeypatch.setattr(config, "BUSINESS_ID", "bizA")
     update_lead("+91100000001", "Closed Won", "", confidence=95)
+
+    monkeypatch.setattr(config, "BUSINESS_ID", "bizB")
     update_lead("+91100000002", "New", "", confidence=10)
 
     result_a = _build_dashboard_analytics("u1")
@@ -148,7 +166,9 @@ def test_dashboard_analytics_does_not_leak_leads_across_businesses(isolated_db):
     assert result_a["status_distribution"] == {"Closed Won": 1}
 
 
-def test_dashboard_analytics_does_not_leak_opportunities_across_businesses(isolated_db):
+def test_dashboard_analytics_does_not_leak_opportunities_across_businesses(isolated_db, monkeypatch):
+
+    import config
 
     _register_business("u1", "bizA", "+10000000001")
     _register_business("u2", "bizB", "+10000000002")
@@ -156,7 +176,10 @@ def test_dashboard_analytics_does_not_leak_opportunities_across_businesses(isola
     _attach_customer("+91100000001", "+10000000001", "bizA", "Alice")
     _attach_customer("+91100000002", "+10000000002", "bizB", "Bob")
 
+    monkeypatch.setattr(config, "BUSINESS_ID", "bizA")
     add_opportunity("+91100000001", "New Business", 80, "Interested", estimated_value=5000)
+
+    monkeypatch.setattr(config, "BUSINESS_ID", "bizB")
     add_opportunity("+91100000002", "New Business", 80, "Interested", estimated_value=9000)
 
     result_a = _build_dashboard_analytics("u1")
@@ -201,9 +224,13 @@ def test_dashboard_analytics_unregistered_user_id_returns_empty_shape(isolated_d
 
 def test_runner_fetches_customer_stats_once_per_business_not_per_rule(isolated_db, monkeypatch):
 
+    import config
+
     _register_business("u1", "bizA", "+10000000001")
     _attach_customer("+91100000001", "+10000000001", "bizA", "Alice")
     add_message("bizA:+91100000001", "user", "Hi, I'm interested")
+
+    monkeypatch.setattr(config, "BUSINESS_ID", "bizA")
     update_lead("+91100000001", "Closed Won", "", confidence=90)
 
     # Three rules for the same business - before the fix,

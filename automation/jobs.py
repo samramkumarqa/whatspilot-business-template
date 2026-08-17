@@ -45,9 +45,11 @@ async def send_due_reminders():
         )
         return
 
-    business_phone = business["whatsapp_number"]
-
-    reminders = await asyncio.to_thread(get_reminders, business_phone)
+    # get_reminders() itself now filters on business_id = config.BUSINESS_ID
+    # (see reminder_manager.py) - the active-business check above is still
+    # needed (skip entirely if this deployment's business isn't active),
+    # but there's no business_phone left to resolve/pass through.
+    reminders = await asyncio.to_thread(get_reminders)
 
     if not reminders:
         logger.info("No reminders found")

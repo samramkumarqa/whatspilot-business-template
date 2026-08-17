@@ -1,3 +1,4 @@
+import config
 from ai.lead_ai import calculate_lead_score
 from database.db import get_crm_connection, create_index_if_missing
 
@@ -58,9 +59,21 @@ def init_leads():
     # would fail immediately on the first update_lead() call with
     # "table leads has no column named lead_score". Schema below now matches
     # the real, live table.
+    # business_id: PRIMARY KEY is (customer_phone, business_id), not
+    # customer_phone alone - see migrations/add_business_id_to_crm_tables.py's
+    # module docstring for why. customer_phone alone would mean two
+    # different businesses' deployments both messaging the same phone
+    # number share (and overwrite) one literal row - not just a read-scoping
+    # leak but actual data loss. This only defines the composite key
+    # correctly for a genuinely fresh table (tests, new local dev); an
+    # EXISTING production table gets business_id added as a nullable
+    # column below and its PRIMARY KEY tightened separately, by hand, via
+    # that migration script - see its docstring for why this can't safely
+    # happen automatically here under the restricted business-portal role.
     conn.execute("""
     CREATE TABLE IF NOT EXISTS leads (
-        customer_phone TEXT PRIMARY KEY,
+        customer_phone TEXT,
+        business_id TEXT,
         status TEXT DEFAULT 'New',
         notes TEXT DEFAULT '',
         confidence INTEGER DEFAULT 50,
@@ -77,7 +90,8 @@ def init_leads():
         follow_up_days INTEGER DEFAULT 1,
         tags TEXT DEFAULT '',
         priority TEXT DEFAULT 'Medium',
-        summary TEXT DEFAULT ''
+        summary TEXT DEFAULT '',
+        PRIMARY KEY (customer_phone, business_id)
     )
     """)
 
@@ -109,6 +123,23 @@ def init_leads():
             "ALTER TABLE leads ADD COLUMN ai_paused_at TIMESTAMP"
         )
 
+    # business_id: added as a nullable column here for an EXISTING table
+    # that predates it (this guard is a no-op once
+    # migrations/add_business_id_to_crm_tables.py has run - see that
+    # script's docstring for why the composite PRIMARY KEY change can't
+    # also happen automatically here). A genuinely fresh table already
+    # got business_id, NOT NULL, as part of its PRIMARY KEY from the
+    # CREATE TABLE above, so this never fires for tests/new local dev.
+    if "business_id" not in existing_lead_columns:
+        conn.execute(
+            "ALTER TABLE leads ADD COLUMN business_id TEXT"
+        )
+
+    create_index_if_missing(
+        conn, "idx_leads_business_id",
+        "CREATE INDEX idx_leads_business_id ON leads(business_id)"
+    )
+
     # NOTE: also kept in sync with crm/opportunity_manager.py's
     # init_opportunities(), which creates the same table - see the note
     # there. init_leads() runs first in main.py, so this definition is the
@@ -119,6 +150,8 @@ def init_leads():
             id SERIAL PRIMARY KEY,
 
             customer_phone TEXT,
+
+            business_id TEXT,
 
             opportunity_type TEXT,
 
@@ -137,6 +170,7 @@ def init_leads():
     CREATE TABLE IF NOT EXISTS lead_history (
         id SERIAL PRIMARY KEY,
         customer_phone TEXT,
+        business_id TEXT,
         status TEXT,
         confidence INTEGER,
         reason TEXT,
@@ -155,20 +189,43 @@ def init_leads():
         "CREATE INDEX idx_lead_history_customer_phone ON lead_history(customer_phone)"
     )
 
+    # lead_history has no dedicated init_ of its own (unlike opportunities,
+    # which also gets a business_id guard in crm/opportunity_manager.py's
+    # init_opportunities()) - this is the only place it's created, so this
+    # guard has to live here.
+    existing_lead_history_columns = {
+        row[0] for row in
+        conn.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = current_schema() AND table_name = 'lead_history'"
+        ).fetchall()
+    }
+
+    if "business_id" not in existing_lead_history_columns:
+        conn.execute(
+            "ALTER TABLE lead_history ADD COLUMN business_id TEXT"
+        )
+
+    create_index_if_missing(
+        conn, "idx_lead_history_business_id",
+        "CREATE INDEX idx_lead_history_business_id ON lead_history(business_id)"
+    )
+
     conn.commit()
     conn.close()
 
 def get_lead(customer_phone):
 
     conn = get_crm_connection()
-    
+
     row = conn.execute(
         """
         SELECT *
         FROM leads
         WHERE customer_phone = ?
+        AND business_id = ?
         """,
-        (customer_phone,)
+        (customer_phone, config.BUSINESS_ID)
     ).fetchone()
 
     conn.close()
@@ -196,14 +253,14 @@ def pause_ai(customer_phone, reason):
 
     conn.execute(
         """
-        INSERT INTO leads (customer_phone, ai_paused, ai_paused_reason, ai_paused_at)
-        VALUES (?, 1, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(customer_phone) DO UPDATE SET
+        INSERT INTO leads (customer_phone, business_id, ai_paused, ai_paused_reason, ai_paused_at)
+        VALUES (?, ?, 1, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(customer_phone, business_id) DO UPDATE SET
             ai_paused = 1,
             ai_paused_reason = excluded.ai_paused_reason,
             ai_paused_at = CURRENT_TIMESTAMP
         """,
-        (customer_phone, reason)
+        (customer_phone, config.BUSINESS_ID, reason)
     )
 
     conn.commit()
@@ -227,8 +284,9 @@ def resume_ai(customer_phone):
             ai_paused_reason = '',
             ai_paused_at = NULL
         WHERE customer_phone = ?
+        AND business_id = ?
         """,
-        (customer_phone,)
+        (customer_phone, config.BUSINESS_ID)
     )
 
     conn.commit()
@@ -267,6 +325,7 @@ def update_lead(
         INSERT INTO leads
         (
             customer_phone,
+            business_id,
             status,
             notes,
             confidence,
@@ -274,8 +333,8 @@ def update_lead(
             updated_by,
             lead_score
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(customer_phone) DO UPDATE SET
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(customer_phone, business_id) DO UPDATE SET
             status=excluded.status,
             notes=excluded.notes,
             confidence=excluded.confidence,
@@ -285,6 +344,7 @@ def update_lead(
         """,
         (
             customer_phone,
+            config.BUSINESS_ID,
             status,
             notes,
             confidence,
@@ -299,15 +359,17 @@ def update_lead(
         INSERT INTO lead_history
         (
             customer_phone,
+            business_id,
             status,
             confidence,
             reason,
             updated_by
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
         (
             customer_phone,
+            config.BUSINESS_ID,
             status,
             confidence,
             reason,
@@ -332,9 +394,10 @@ def get_lead_timeline(customer_phone):
             created_at
         FROM lead_history
         WHERE customer_phone = ?
+        AND business_id = ?
         ORDER BY created_at DESC
         """,
-        (customer_phone,)
+        (customer_phone, config.BUSINESS_ID)
     )
 
     rows = cursor.fetchall()
@@ -352,44 +415,35 @@ def get_lead_timeline(customer_phone):
         for row in rows
     ]
 
-def get_lead_categories(business_phone=None):
+def get_lead_categories():
     """
-    business_phone=None (the default) returns leads for every business -
-    unsafe for any HTTP-facing caller, since this is a shared Postgres
-    database and every business's leads live in the same `leads` table.
-    api/misc.py's GET /lead-categories MUST pass a business_phone (same
-    reasoning as reminder_manager.get_reminders()) - leaving it unset
-    there previously let any logged-in business owner see every other
-    business's customer phone numbers and lead scores.
+    Every lead for this deployment's own business, bucketed by
+    lead_score. Filters on business_id = config.BUSINESS_ID directly now
+    (this deployment's own, authoritative, write-time-stamped scope)
+    rather than joining through customer_mapping's business_phone, which
+    only reflects a customer's *current* mapped business and would
+    misattribute historical leads for a phone number that has ever
+    switched businesses - see migrations/add_business_id_to_crm_tables.py's
+    module docstring. Previously took an optional business_phone param
+    that HTTP callers had to remember to pass (a None default here once
+    caused a real cross-tenant leak in api/misc.py's GET
+    /lead-categories) - there's now only one correct scope for any caller
+    in this deployment, so there's nothing left to forget to pass.
     """
 
     conn = get_crm_connection()
 
-    if business_phone is None:
-
-        cursor = conn.execute("""
-            SELECT
-                customer_phone,
-                status,
-                lead_score
-            FROM leads
-        """)
-
-    else:
-
-        cursor = conn.execute(
-            """
-            SELECT
-                l.customer_phone,
-                l.status,
-                l.lead_score
-            FROM leads l
-            INNER JOIN customer_mapping cm
-                ON l.customer_phone = cm.customer_phone
-            WHERE cm.business_phone = ?
-            """,
-            (business_phone,)
-        )
+    cursor = conn.execute(
+        """
+        SELECT
+            customer_phone,
+            status,
+            lead_score
+        FROM leads
+        WHERE business_id = ?
+        """,
+        (config.BUSINESS_ID,)
+    )
 
     rows = cursor.fetchall()
 
@@ -434,14 +488,16 @@ def save_opportunity(
         INSERT INTO opportunities
         (
             customer_phone,
+            business_id,
             opportunity_type,
             confidence,
             reason
         )
-        VALUES (?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
         """,
         (
             customer_phone,
+            config.BUSINESS_ID,
             opportunity_type,
             confidence,
             reason
@@ -485,6 +541,7 @@ def update_lead_intelligence(
         INSERT INTO leads
         (
             customer_phone,
+            business_id,
             status,
             confidence,
             reason,
@@ -507,10 +564,10 @@ def update_lead_intelligence(
         (
             ?,?,?,?,?,?,
             ?,?,?,?,?,?,
-            ?,?,?,?
+            ?,?,?,?,?
         )
 
-        ON CONFLICT(customer_phone)
+        ON CONFLICT(customer_phone, business_id)
         DO UPDATE SET
 
             status=excluded.status,
@@ -532,6 +589,8 @@ def update_lead_intelligence(
         """,
         (
             customer_phone,
+
+            config.BUSINESS_ID,
 
             new_status,
 
@@ -570,6 +629,7 @@ def update_lead_intelligence(
         INSERT INTO lead_history
         (
             customer_phone,
+            business_id,
             status,
             confidence,
             reason,
@@ -578,11 +638,13 @@ def update_lead_intelligence(
 
         VALUES
         (
-            ?,?,?,?,?
+            ?,?,?,?,?,?
         )
         """,
         (
             customer_phone,
+
+            config.BUSINESS_ID,
 
             new_status,
 

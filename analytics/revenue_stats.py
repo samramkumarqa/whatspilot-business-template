@@ -13,7 +13,7 @@ same choice for the same reason.
 
 from datetime import datetime
 
-from crm.customer_mapping import get_business_phone_by_user
+from crm.customer_mapping import get_business_id
 from database.db import get_crm_connection
 
 
@@ -36,23 +36,21 @@ def get_won_revenue_trend(user_id, months=6):
     labels, keys = _last_n_months(months)
     revenue_by_key = {key: 0 for key in keys}
 
-    business_phone = get_business_phone_by_user(user_id)
+    business_id = get_business_id(user_id)
 
-    if not business_phone:
+    if not business_id:
         return {"labels": labels, "values": [0] * len(keys)}
 
     conn = get_crm_connection()
 
     won_rows = conn.execute(
         """
-        SELECT l.customer_phone
-        FROM leads l
-        INNER JOIN customer_mapping cm
-            ON l.customer_phone = cm.customer_phone
-        WHERE cm.business_phone = ?
-        AND l.status = 'Closed Won'
+        SELECT customer_phone
+        FROM leads
+        WHERE business_id = ?
+        AND status = 'Closed Won'
         """,
-        (business_phone,)
+        (business_id,)
     ).fetchall()
 
     won_phones = [row[0] for row in won_rows]
@@ -68,10 +66,11 @@ def get_won_revenue_trend(user_id, months=6):
         SELECT customer_phone, MAX(created_at) as won_at
         FROM lead_history
         WHERE customer_phone IN ({placeholders})
+        AND business_id = ?
         AND status = 'Closed Won'
         GROUP BY customer_phone
         """,
-        won_phones
+        won_phones + [business_id]
     ).fetchall()
 
     won_at_by_phone = {row[0]: row[1] for row in won_at_rows}
@@ -81,9 +80,10 @@ def get_won_revenue_trend(user_id, months=6):
         SELECT customer_phone, SUM(estimated_value)
         FROM opportunities
         WHERE customer_phone IN ({placeholders})
+        AND business_id = ?
         GROUP BY customer_phone
         """,
-        won_phones
+        won_phones + [business_id]
     ).fetchall()
 
     value_by_phone = {row[0]: (row[1] or 0) for row in value_rows}

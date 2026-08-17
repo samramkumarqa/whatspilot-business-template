@@ -159,8 +159,9 @@ def _build_dashboard_analytics(user_id: str):
             SELECT lead_score, status
             FROM leads
             WHERE customer_phone IN ({placeholders})
+            AND business_id = ?
             """,
-            customer_phones
+            customer_phones + [business_id]
         )
 
     else:
@@ -209,9 +210,10 @@ def _build_dashboard_analytics(user_id: str):
                 COUNT(*) AS total
             FROM opportunities
             WHERE customer_phone IN ({placeholders})
+            AND business_id = ?
             GROUP BY status
             """,
-            customer_phones
+            customer_phones + [business_id]
         )
 
     else:

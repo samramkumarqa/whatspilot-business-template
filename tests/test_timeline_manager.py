@@ -13,19 +13,27 @@ timestamps, these tests insert rows directly with explicit created_at
 values, to deterministically exercise the collapsing/dedup logic.
 """
 
+import config
 from database.db import get_crm_connection
 from timeline_manager import get_customer_timeline
 
 
 def _insert_history(phone, status, created_at, confidence=50, reason="", updated_by="AI"):
+    # business_id is stamped here too - get_lead_timeline() (called by
+    # get_customer_timeline()) now filters lead_history on
+    # business_id = config.BUSINESS_ID, same as every other CRM table -
+    # see migrations/add_business_id_to_crm_tables.py's module docstring.
+    # conftest.py's isolated_db fixture sets a default config.BUSINESS_ID
+    # for the whole test, so reading it here keeps this in sync with
+    # whatever that default is.
     conn = get_crm_connection()
     conn.execute(
         """
         INSERT INTO lead_history
-        (customer_phone, status, confidence, reason, updated_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (customer_phone, business_id, status, confidence, reason, updated_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (phone, status, confidence, reason, updated_by, created_at)
+        (phone, config.BUSINESS_ID, status, confidence, reason, updated_by, created_at)
     )
     conn.commit()
     conn.close()
@@ -36,10 +44,10 @@ def _insert_activity(phone, activity_type, title, details, created_at):
     conn.execute(
         """
         INSERT INTO ai_activity
-        (customer_phone, activity_type, title, details, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        (customer_phone, business_id, activity_type, title, details, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (phone, activity_type, title, details, created_at)
+        (phone, config.BUSINESS_ID, activity_type, title, details, created_at)
     )
     conn.commit()
     conn.close()

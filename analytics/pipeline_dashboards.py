@@ -6,15 +6,15 @@ concerns in one file.
 
 from datetime import datetime
 
-from crm.customer_mapping import get_business_phone_by_user
+from crm.customer_mapping import get_business_id
 from database.db import get_crm_connection
 
 
 def get_opportunity_dashboard(user_id):
 
-    business_phone = get_business_phone_by_user(user_id)
+    business_id = get_business_id(user_id)
 
-    if not business_phone:
+    if not business_id:
 
         return {
             "total": 0,
@@ -30,15 +30,13 @@ def get_opportunity_dashboard(user_id):
     rows = conn.execute(
         """
         SELECT
-            o.opportunity_type,
-            o.status,
-            o.estimated_value
-        FROM opportunities o
-        INNER JOIN customer_mapping cm
-            ON o.customer_phone = cm.customer_phone
-        WHERE cm.business_phone = ?
+            opportunity_type,
+            status,
+            estimated_value
+        FROM opportunities
+        WHERE business_id = ?
         """,
-        (business_phone,)
+        (business_id,)
     ).fetchall()
 
     conn.close()
@@ -77,9 +75,9 @@ def get_opportunity_dashboard(user_id):
 
 def get_reminder_dashboard(user_id):
 
-    business_phone = get_business_phone_by_user(user_id)
+    business_id = get_business_id(user_id)
 
-    if not business_phone:
+    if not business_id:
 
         return {
             "total": 0,
@@ -94,14 +92,12 @@ def get_reminder_dashboard(user_id):
     rows = conn.execute(
         """
         SELECT
-            r.due_date,
-            r.completed
-        FROM reminders r
-        INNER JOIN customer_mapping cm
-            ON r.customer_phone = cm.customer_phone
-        WHERE cm.business_phone = ?
+            due_date,
+            completed
+        FROM reminders
+        WHERE business_id = ?
         """,
-        (business_phone,)
+        (business_id,)
     ).fetchall()
 
     conn.close()

@@ -4,7 +4,6 @@ from fastapi.templating import Jinja2Templates
 
 from auth import enforce_tenant_access, resolve_dashboard_user_id
 from reminder_manager import get_reminders
-from crm.customer_mapping import get_business_phone_by_user
 from crm.lead_manager import get_lead_categories
 from analytics.analytics import (
     get_opportunity_dashboard,
@@ -79,48 +78,38 @@ async def reminders(user_id: str, request: Request):
     against the session via enforce_tenant_access() - previously this had
     no user_id/authorization at all and returned every business's
     reminders to any logged-in business owner.
+
+    get_reminders() itself is scoped to this deployment's own
+    config.BUSINESS_ID (see reminder_manager.py) - there's no longer a
+    business_phone to resolve/pass here, just the session check above.
     """
 
     enforce_tenant_access(request, user_id)
 
-    business_phone = await run_in_threadpool(get_business_phone_by_user, user_id)
-
-    if not business_phone:
-        return {
-            "status": "success",
-            "reminders": []
-        }
-
     return {
         "status": "success",
-        "reminders": await run_in_threadpool(get_reminders, business_phone)
+        "reminders": await run_in_threadpool(get_reminders)
     }
 
 @router.get("/lead-categories")
 async def lead_categories(user_id: str, request: Request):
     """
     BUG FIX: this previously took no user_id/authorization at all and
-    called get_lead_categories() with no business_phone, returning every
+    called get_lead_categories() with no business scoping, returning every
     business's customer phone numbers, lead status, and lead score to
     any logged-in business owner - same class of cross-tenant leak
     GET /reminders above was already fixed for (see that route's
     docstring). Not currently called from any template, but it was a
     live, reachable, authenticated-but-unscoped endpoint.
+
+    get_lead_categories() itself is scoped to this deployment's own
+    config.BUSINESS_ID (see crm/lead_manager.py) - there's no longer a
+    business_phone to resolve/pass here, just the session check above.
     """
 
     enforce_tenant_access(request, user_id)
 
-    business_phone = await run_in_threadpool(get_business_phone_by_user, user_id)
-
-    if not business_phone:
-        return {
-            "status": "success",
-            "hot": [],
-            "warm": [],
-            "cold": []
-        }
-
-    categories = await run_in_threadpool(get_lead_categories, business_phone)
+    categories = await run_in_threadpool(get_lead_categories)
 
     return {
         "status": "success",

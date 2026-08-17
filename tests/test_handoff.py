@@ -126,7 +126,8 @@ def test_new_lead_defaults_to_not_paused(isolated_db):
 # analytics/customer_stats.py surfaces ai_paused
 # ---------------------------------------------------------------------
 
-def test_customer_stats_reflects_ai_paused_flag(isolated_db):
+def test_customer_stats_reflects_ai_paused_flag(isolated_db, monkeypatch):
+    import config
     from crm.customer_mapping import save_customer_number, save_mapping
     from conversations import add_message
     from analytics.customer_stats import get_customer_stats
@@ -135,6 +136,11 @@ def test_customer_stats_reflects_ai_paused_flag(isolated_db):
     save_mapping(customer_phone="+919962824442", business_phone="+10000000000", customer_name="Test")
     add_message("biz1:+919962824442", "user", "hi")
 
+    # pause_ai() stamps whichever business_id config.BUSINESS_ID currently
+    # points at, while get_customer_stats() resolves business_id via the
+    # registered get_business_id("u1") - "biz1" above. These have to match,
+    # same as they always do in a real deployment.
+    monkeypatch.setattr(config, "BUSINESS_ID", "biz1")
     pause_ai("+919962824442", "Customer asked for a human")
 
     customers = get_customer_stats("u1")

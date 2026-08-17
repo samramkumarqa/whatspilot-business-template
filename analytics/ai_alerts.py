@@ -13,7 +13,7 @@ def get_ai_alerts(user_id):
 
     row = conn.execute(
         """
-        SELECT whatsapp_number
+        SELECT whatsapp_number, business_id
         FROM customer_numbers
         WHERE user_id=?
         """,
@@ -25,7 +25,7 @@ def get_ai_alerts(user_id):
         conn.close()
         return []
 
-    business_phone = row["whatsapp_number"]
+    business_id = row["business_id"]
 
     alerts = []
 
@@ -35,13 +35,11 @@ def get_ai_alerts(user_id):
 
     customers = conn.execute(
         """
-        SELECT l.*
-        FROM leads l
-        INNER JOIN customer_mapping cm
-            ON l.customer_phone = cm.customer_phone
-        WHERE cm.business_phone=?
+        SELECT *
+        FROM leads
+        WHERE business_id=?
         """,
-        (business_phone,)
+        (business_id,)
     ).fetchall()
 
     conn.close()

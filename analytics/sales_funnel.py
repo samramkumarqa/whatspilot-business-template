@@ -3,15 +3,15 @@ Lead funnel and lead-score dashboards. Split out of analytics/analytics.py,
 which had grown to mix several unrelated dashboard concerns in one file.
 """
 
-from crm.customer_mapping import get_business_phone_by_user
+from crm.customer_mapping import get_business_id
 from database.db import get_crm_connection
 
 
 def get_sales_funnel(user_id):
 
-    business_phone = get_business_phone_by_user(user_id)
+    business_id = get_business_id(user_id)
 
-    if not business_phone:
+    if not business_id:
 
         return {
             "total_leads": 0,
@@ -31,15 +31,13 @@ def get_sales_funnel(user_id):
     cursor = conn.execute(
         """
         SELECT
-            l.status,
+            status,
             COUNT(*)
-        FROM leads l
-        INNER JOIN customer_mapping cm
-            ON l.customer_phone = cm.customer_phone
-        WHERE cm.business_phone = ?
-        GROUP BY l.status
+        FROM leads
+        WHERE business_id = ?
+        GROUP BY status
         """,
-        (business_phone,)
+        (business_id,)
     )
 
     rows = cursor.fetchall()
@@ -79,9 +77,9 @@ def get_sales_funnel(user_id):
 
 def get_lead_score_dashboard(user_id):
 
-    business_phone = get_business_phone_by_user(user_id)
+    business_id = get_business_id(user_id)
 
-    if not business_phone:
+    if not business_id:
 
         return {
             "hot": 0,
@@ -95,13 +93,11 @@ def get_lead_score_dashboard(user_id):
     cursor = conn.execute(
         """
         SELECT
-            l.lead_score
-        FROM leads l
-        INNER JOIN customer_mapping cm
-            ON l.customer_phone = cm.customer_phone
-        WHERE cm.business_phone = ?
+            lead_score
+        FROM leads
+        WHERE business_id = ?
         """,
-        (business_phone,)
+        (business_id,)
     )
 
     scores = [

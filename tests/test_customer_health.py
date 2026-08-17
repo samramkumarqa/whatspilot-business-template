@@ -11,6 +11,7 @@ per-customer version.
 
 from datetime import datetime, timedelta
 
+import config
 from analytics.customer_health import get_customer_health_dashboard
 from crm.customer_mapping import save_customer_number, save_mapping
 from crm.lead_manager import update_lead_intelligence
@@ -21,6 +22,23 @@ from database.db import get_conversation_connection
 def _seed_business(user_id="u1", business_id="business_001", business_phone="+10000000000"):
     save_customer_number(user_id, business_phone, business_id)
     return business_phone
+
+
+# get_customer_health_dashboard() resolves business_id via the registered
+# customer_numbers row (get_business_id(user_id), see
+# analytics/customer_health.py), while update_lead_intelligence() and
+# upsert_reminder() stamp whichever business_id config.BUSINESS_ID
+# currently points at - these have to match, same as they always do in a
+# real deployment, so writes below go through these wrappers rather than
+# calling the CRM/reminder functions directly.
+def _update_lead_intelligence_for(monkeypatch, business_id, *args, **kwargs):
+    monkeypatch.setattr(config, "BUSINESS_ID", business_id)
+    update_lead_intelligence(*args, **kwargs)
+
+
+def _upsert_reminder_for(monkeypatch, business_id, *args, **kwargs):
+    monkeypatch.setattr(config, "BUSINESS_ID", business_id)
+    upsert_reminder(*args, **kwargs)
 
 
 def _seed_conversation(business_id, customer_phone, created_at):
@@ -87,13 +105,14 @@ def _full_analysis(**overrides):
     return analysis
 
 
-def test_dashboard_classifies_customers_by_health_score(isolated_db):
+def test_dashboard_classifies_customers_by_health_score(isolated_db, monkeypatch):
     business_phone = _seed_business()
 
     # A healthy, engaged customer: strong lead score, "Customer" buying
     # stage, positive sentiment, no overdue reminders, seen recently.
     save_mapping("+20000000001", business_phone)
-    update_lead_intelligence(
+    _update_lead_intelligence_for(
+        monkeypatch, "business_001",
         "+20000000001",
         _full_analysis(
             status="Closed Won",
@@ -110,7 +129,7 @@ def test_dashboard_classifies_customers_by_health_score(isolated_db):
     # An at-risk customer: no lead record at all (defaults apply), an
     # overdue reminder, and never seen in conversations.
     save_mapping("+20000000002", business_phone)
-    upsert_reminder("+20000000002", "Follow up", days=-5)
+    _upsert_reminder_for(monkeypatch, "business_001", "+20000000002", "Follow up", days=-5)
 
     dashboard = get_customer_health_dashboard("u1")
 

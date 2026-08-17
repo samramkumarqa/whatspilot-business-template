@@ -8,6 +8,7 @@ if PROJECT_ROOT not in sys.path:
 
 import pytest
 
+import config
 import database.db as db
 import rate_limit
 
@@ -60,6 +61,23 @@ def isolated_db(monkeypatch):
     conn.close()
 
     monkeypatch.setattr(db, "_test_schema", schema)
+
+    # crm/lead_manager.py, crm/opportunity_manager.py, crm/activity_manager.py,
+    # crm/followup_manager.py and reminder_manager.py all stamp/filter their
+    # rows by config.BUSINESS_ID (read dynamically via `import config` rather
+    # than `from config import BUSINESS_ID`, specifically so this one default
+    # covers every one of those modules without each test needing its own
+    # monkeypatch - see those modules for why business_id exists at all: a
+    # bare customer_phone is not a safe scope in this shared-Postgres,
+    # one-business-per-deployment architecture, since the same phone number
+    # could in principle be a customer of two different businesses).
+    # Production always has a real BUSINESS_ID (main.py refuses to boot
+    # without one); tests need some non-None default so reads/writes agree
+    # on a value without every existing single-business test having to set
+    # one itself. Tests that specifically exercise multi-business isolation
+    # (e.g. tests/test_jobs_tenant_isolation.py) override this per-business
+    # around each business's own writes/reads.
+    monkeypatch.setattr(config, "BUSINESS_ID", "test_business_id")
 
     from crm.customer_mapping import (
         init_customer_mapping,

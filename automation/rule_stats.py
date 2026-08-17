@@ -164,11 +164,25 @@ def get_rule_performance(business_id=None):
     # query per rule inside the loop below.
     crm_conn = get_crm_connection()
 
-    won_phones = {
-        row[0] for row in crm_conn.execute(
-            "SELECT customer_phone FROM leads WHERE status = 'Closed Won'"
-        ).fetchall()
-    }
+    # business_id is None here means "every business" (the same
+    # backward-compatible default get_all_rules() above uses) - a plain
+    # `business_id = ?` with a None param would match nothing (SQL NULL
+    # comparison), not "everything", so the filter clause is only added
+    # when a real business_id was passed.
+    if business_id is not None:
+        won_phones = {
+            row[0] for row in crm_conn.execute(
+                "SELECT customer_phone FROM leads WHERE status = 'Closed Won' "
+                "AND business_id = ?",
+                (business_id,)
+            ).fetchall()
+        }
+    else:
+        won_phones = {
+            row[0] for row in crm_conn.execute(
+                "SELECT customer_phone FROM leads WHERE status = 'Closed Won'"
+            ).fetchall()
+        }
 
     crm_conn.close()
 

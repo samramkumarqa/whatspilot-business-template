@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
+import config
 from auth import enforce_tenant_access, enforce_tenant_access_for_customer
-from crm.customer_mapping import get_business_phone_by_user
 from database.db import get_crm_connection
 from reminder_manager import (
     find_stale_reminders,
@@ -37,50 +37,30 @@ def get_connection():
 # customer named "stale") instead of reaching these.
 # =====================================================
 
-async def _business_phone_for(user_id: str, request: Request) -> str | None:
-    """
-    Shared by the /reminders/stale routes below: verifies the session is
-    allowed to see `user_id`'s data, then resolves it to a business_phone
-    for scoping the reminders query.
-    """
-
-    enforce_tenant_access(request, user_id)
-
-    return await run_in_threadpool(get_business_phone_by_user, user_id)
-
-
 @router.get("/reminders/stale")
 async def preview_stale_reminders(user_id: str, request: Request):
     """
     Reminders whose originating rule has since been deleted, no longer
     has a Create Reminder action, or now says something different - i.e.
     the reminder text on screen no longer reflects the rule's real,
-    current configuration. Scoped to the requesting business - requires
-    user_id and checks it against the session first.
+    current configuration. Requires user_id and checks it against the
+    session first; find_stale_reminders() itself is scoped to this
+    deployment's own config.BUSINESS_ID (see reminder_manager.py).
     """
 
-    business_phone = await _business_phone_for(user_id, request)
-
-    if not business_phone:
-        return {"stale": []}
+    enforce_tenant_access(request, user_id)
 
     return {
-        "stale": await run_in_threadpool(find_stale_reminders, business_phone)
+        "stale": await run_in_threadpool(find_stale_reminders)
     }
 
 
 @router.delete("/reminders/stale")
 async def clear_stale_reminders(user_id: str, request: Request):
 
-    business_phone = await _business_phone_for(user_id, request)
+    enforce_tenant_access(request, user_id)
 
-    if not business_phone:
-        return {
-            "status": "success",
-            "deleted": 0
-        }
-
-    deleted = await run_in_threadpool(delete_stale_reminders, business_phone)
+    deleted = await run_in_threadpool(delete_stale_reminders)
 
     return {
         "status": "success",
@@ -123,6 +103,16 @@ async def mark_reminder_complete(reminder_id: int, request: Request):
 # =====================================================
 
 def _fetch_customer_reminders(customer_phone: str):
+    """
+    BUG FIX: this used to filter on customer_phone alone - a bare
+    customer_phone match, with no business_id filter, is not a safe scope
+    in this shared-Postgres, one-business-per-deployment architecture (see
+    reminder_manager.py's get_reminders() docstring and
+    migrations/add_business_id_to_crm_tables.py's module docstring for
+    why). enforce_tenant_access_for_customer() below only confirms the
+    *session* is allowed to see this customer_phone - it doesn't change
+    what this query itself returns, so the query has to scope itself too.
+    """
 
     conn = get_connection()
 
@@ -135,11 +125,12 @@ def _fetch_customer_reminders(customer_phone: str):
         FROM reminders
 
         WHERE customer_phone = ?
+        AND business_id = ?
         AND completed = 0
 
         ORDER BY due_date ASC
 
-    """, (customer_phone,))
+    """, (customer_phone, config.BUSINESS_ID))
 
     reminders = [
         dict(row)

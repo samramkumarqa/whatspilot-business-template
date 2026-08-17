@@ -1,3 +1,4 @@
+import config
 from database.db import (
     get_crm_connection,
     get_conversation_connection
@@ -115,11 +116,13 @@ def get_reminder_stats(
         SELECT COUNT(*)
         FROM reminders
         WHERE customer_phone=?
+        AND business_id=?
         AND completed=0
         AND due_date < ?
         """,
         (
             customer_phone,
+            config.BUSINESS_ID,
             today
         )
     ).fetchone()[0]
@@ -154,7 +157,7 @@ def get_customer_health_dashboard(user_id):
 
     row = conn.execute(
         """
-        SELECT whatsapp_number
+        SELECT whatsapp_number, business_id
         FROM customer_numbers
         WHERE user_id=?
         """,
@@ -174,6 +177,7 @@ def get_customer_health_dashboard(user_id):
         return dashboard
 
     business_phone = row["whatsapp_number"]
+    business_id = row["business_id"]
 
     #
     # Get all customers
@@ -204,8 +208,9 @@ def get_customer_health_dashboard(user_id):
         SELECT *
         FROM leads
         WHERE customer_phone IN ({placeholders})
+        AND business_id = ?
         """,
-        tuple(customer_phones)
+        tuple(customer_phones) + (business_id,)
     ).fetchall()
 
     leads_by_phone = {
@@ -225,9 +230,10 @@ def get_customer_health_dashboard(user_id):
         WHERE customer_phone IN ({placeholders})
         AND completed=0
         AND due_date < ?
+        AND business_id = ?
         GROUP BY customer_phone
         """,
-        tuple(customer_phones) + (today,)
+        tuple(customer_phones) + (today, business_id)
     ).fetchall()
 
     overdue_by_phone = {
@@ -238,12 +244,11 @@ def get_customer_health_dashboard(user_id):
     conn.close()
 
     #
-    # Batch: every customer's last-seen conversation timestamp, resolved
-    # via ONE business_id lookup (instead of once per customer) plus ONE
-    # grouped MAX(created_at) query.
+    # Batch: every customer's last-seen conversation timestamp, via ONE
+    # grouped MAX(created_at) query. business_id was already resolved
+    # above (same customer_numbers row as business_phone), so there's no
+    # second lookup needed here anymore.
     #
-    business_id = get_business_id(user_id)
-
     last_seen_by_phone = {}
 
     if business_id:

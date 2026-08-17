@@ -1,3 +1,4 @@
+import config
 from database.db import get_crm_connection, create_index_if_missing
 
 def init_opportunities():
@@ -14,6 +15,7 @@ def init_opportunities():
     CREATE TABLE IF NOT EXISTS opportunities (
         id SERIAL PRIMARY KEY,
         customer_phone TEXT,
+        business_id TEXT,
         opportunity_type TEXT,
         confidence INTEGER,
         reason TEXT,
@@ -24,9 +26,33 @@ def init_opportunities():
     )
     """)
 
+    # business_id: this is the module of record for adding it to an
+    # EXISTING opportunities table - see crm/lead_manager.py's init_leads()
+    # for why this table is defined in two places, and
+    # migrations/add_business_id_to_crm_tables.py's docstring for why this
+    # guard (rather than an unconditional ALTER) is required once the
+    # restricted business-portal DB role is in use.
+    existing_columns = {
+        row[0] for row in
+        conn.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = current_schema() AND table_name = 'opportunities'"
+        ).fetchall()
+    }
+
+    if "business_id" not in existing_columns:
+        conn.execute(
+            "ALTER TABLE opportunities ADD COLUMN business_id TEXT"
+        )
+
     create_index_if_missing(
         conn, "idx_opportunities_customer_phone",
         "CREATE INDEX idx_opportunities_customer_phone ON opportunities(customer_phone)"
+    )
+
+    create_index_if_missing(
+        conn, "idx_opportunities_business_id",
+        "CREATE INDEX idx_opportunities_business_id ON opportunities(business_id)"
     )
 
     conn.commit()
@@ -48,11 +74,13 @@ def add_opportunity(
         SELECT id
         FROM opportunities
         WHERE customer_phone = ?
+        AND business_id = ?
         AND opportunity_type = ?
         AND status = 'Open'
         """,
         (
             customer_phone,
+            config.BUSINESS_ID,
             opportunity_type
         )
     ).fetchone()
@@ -91,16 +119,18 @@ def add_opportunity(
             INSERT INTO opportunities
             (
                 customer_phone,
+                business_id,
                 opportunity_type,
                 confidence,
                 reason,
                 estimated_value,
                 status
             )
-            VALUES (?, ?, ?, ?, ?, 'Open')
+            VALUES (?, ?, ?, ?, ?, ?, 'Open')
             """,
             (
                 customer_phone,
+                config.BUSINESS_ID,
                 opportunity_type,
                 confidence,
                 reason,
@@ -133,9 +163,10 @@ def get_opportunities(customer_phone):
             updated_at
         FROM opportunities
         WHERE customer_phone=?
+        AND business_id=?
         ORDER BY id DESC
         """,
-        (customer_phone,)
+        (customer_phone, config.BUSINESS_ID)
     )
 
     rows = cursor.fetchall()

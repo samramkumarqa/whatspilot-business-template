@@ -7,6 +7,7 @@ anywhere in their conversation history - tested here against the
 isolated_db fixture with real seeded data rather than mocks.
 """
 
+import config
 from crm.customer_mapping import save_customer_number, save_mapping
 from conversations import add_message
 from crm.opportunity_manager import add_opportunity
@@ -15,6 +16,23 @@ from analytics.customer_stats import (
     get_customer_stats,
     get_dashboard_metrics,
 )
+
+
+def _add_opportunity_for(monkeypatch, business_id, *args, **kwargs):
+    """
+    add_opportunity() stamps whichever business_id config.BUSINESS_ID
+    currently points at (see crm/opportunity_manager.py), while
+    get_dashboard_metrics() resolves the customer's *registered*
+    business_id via get_business_id(user_id) (crm/customer_mapping.py) -
+    the real id passed to save_customer_number() in _seed_customer()
+    below, e.g. "biz1". Those two need to match, same as they always do
+    in a real deployment (config.BUSINESS_ID is fixed per deployment and
+    is that deployment's own registered business_id), so every
+    add_opportunity() call in this file has to happen with
+    config.BUSINESS_ID pointed at the seeded business first.
+    """
+    monkeypatch.setattr(config, "BUSINESS_ID", business_id)
+    add_opportunity(*args, **kwargs)
 
 
 def _seed_customer(user_id, business_id, business_phone, customer_phone, name, message):
@@ -104,25 +122,25 @@ def test_dashboard_metrics_counts_customers_and_messages(isolated_db):
     assert metrics["messages"] == 3
 
 
-def test_dashboard_metrics_open_opportunities_reflects_real_opportunities_table(isolated_db):
+def test_dashboard_metrics_open_opportunities_reflects_real_opportunities_table(isolated_db, monkeypatch):
     _seed_customer("u1", "biz1", "+10000000000", "+919962824442", "Saranya S", "hi there")
     _seed_customer("u1", "biz1", "+10000000000", "+916374000275", "Shanthi", "hello")
 
     # Neither seeded customer has a lead_score set at all (defaults to 0),
     # so the old lead_score >= 60 heuristic would have reported 0 here even
     # though there are 2 real open opportunities tracked below.
-    add_opportunity("+919962824442", "Upsell", confidence=90, reason="asked about upgrade")
-    add_opportunity("+916374000275", "New Sale", confidence=70, reason="ready to buy", estimated_value=150000)
+    _add_opportunity_for(monkeypatch, "biz1", "+919962824442", "Upsell", confidence=90, reason="asked about upgrade")
+    _add_opportunity_for(monkeypatch, "biz1", "+916374000275", "New Sale", confidence=70, reason="ready to buy", estimated_value=150000)
 
     metrics = get_dashboard_metrics("u1")
 
     assert metrics["open_opportunities"] == 2
 
 
-def test_dashboard_metrics_excludes_closed_opportunities(isolated_db):
+def test_dashboard_metrics_excludes_closed_opportunities(isolated_db, monkeypatch):
     _seed_customer("u1", "biz1", "+10000000000", "+919962824442", "Saranya S", "hi there")
 
-    add_opportunity("+919962824442", "Upsell", confidence=90, reason="asked about upgrade")
+    _add_opportunity_for(monkeypatch, "biz1", "+919962824442", "Upsell", confidence=90, reason="asked about upgrade")
 
     from database.db import get_crm_connection
     conn = get_crm_connection()

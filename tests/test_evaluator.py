@@ -7,6 +7,7 @@ evaluate_rule() pulls customers via analytics.get_customer_stats(), so it's
 tested against the isolated_db fixture with real seeded data.
 """
 
+import config
 from automation.evaluator import evaluate_condition, evaluate_rule
 from crm.customer_mapping import save_customer_number, save_mapping
 from crm.lead_manager import update_lead
@@ -73,10 +74,18 @@ def test_numeric_operators_coerce_string_values():
 # evaluate_rule - end to end against real seeded data
 # ---------------------------------------------------------------------------
 
-def _seed_customer(user_id, business_id, business_phone, customer_phone, lead_score, status="Interested"):
+def _seed_customer(monkeypatch, user_id, business_id, business_phone, customer_phone, lead_score, status="Interested"):
     save_customer_number(user_id, business_phone, business_id)
     save_mapping(customer_phone=customer_phone, business_phone=business_phone)
     add_message(f"{business_id}:{customer_phone}", "user", "hello")
+    # update_lead() stamps whichever business_id config.BUSINESS_ID
+    # currently points at (see crm/lead_manager.py), while evaluate_rule()
+    # -> get_customer_stats() resolves business_id via the *registered*
+    # get_business_id(user_id) - here always the same string as
+    # business_id above. These have to match, same as they always do in a
+    # real deployment, or the batched leads lookup in get_customer_stats()
+    # won't find this row at all.
+    monkeypatch.setattr(config, "BUSINESS_ID", business_id)
     update_lead(
         customer_phone=customer_phone,
         status=status,
@@ -98,9 +107,9 @@ def _seed_customer(user_id, business_id, business_phone, customer_phone, lead_sc
     conn.close()
 
 
-def test_evaluate_rule_list_format_is_implicit_and(isolated_db):
-    _seed_customer("biz1", "biz1", "+10000000001", "+19990000001", lead_score=90, status="Qualified")
-    _seed_customer("biz1", "biz1", "+10000000001", "+19990000002", lead_score=30, status="New")
+def test_evaluate_rule_list_format_is_implicit_and(isolated_db, monkeypatch):
+    _seed_customer(monkeypatch, "biz1", "biz1", "+10000000001", "+19990000001", lead_score=90, status="Qualified")
+    _seed_customer(monkeypatch, "biz1", "biz1", "+10000000001", "+19990000002", lead_score=30, status="New")
 
     rule = {
         "name": "hot qualified leads",
@@ -115,9 +124,9 @@ def test_evaluate_rule_list_format_is_implicit_and(isolated_db):
     assert [c["phone"] for c in matched] == ["+19990000001"]
 
 
-def test_evaluate_rule_dict_or_format(isolated_db):
-    _seed_customer("biz2", "biz2", "+10000000002", "+19990000003", lead_score=90, status="Qualified")
-    _seed_customer("biz2", "biz2", "+10000000002", "+19990000004", lead_score=10, status="Closed Lost")
+def test_evaluate_rule_dict_or_format(isolated_db, monkeypatch):
+    _seed_customer(monkeypatch, "biz2", "biz2", "+10000000002", "+19990000003", lead_score=90, status="Qualified")
+    _seed_customer(monkeypatch, "biz2", "biz2", "+10000000002", "+19990000004", lead_score=10, status="Closed Lost")
 
     rule = {
         "name": "hot or lost",
@@ -135,9 +144,9 @@ def test_evaluate_rule_dict_or_format(isolated_db):
     assert {c["phone"] for c in matched} == {"+19990000003", "+19990000004"}
 
 
-def test_evaluate_rule_legacy_operator_format(isolated_db):
-    _seed_customer("biz3", "biz3", "+10000000003", "+19990000005", lead_score=85)
-    _seed_customer("biz3", "biz3", "+10000000003", "+19990000006", lead_score=20)
+def test_evaluate_rule_legacy_operator_format(isolated_db, monkeypatch):
+    _seed_customer(monkeypatch, "biz3", "biz3", "+10000000003", "+19990000005", lead_score=85)
+    _seed_customer(monkeypatch, "biz3", "biz3", "+10000000003", "+19990000006", lead_score=20)
 
     # FORMAT 3 (legacy): a bare {"operator": ..., "value": ...} implicitly
     # means "lead_score <operator> value".
@@ -151,8 +160,8 @@ def test_evaluate_rule_legacy_operator_format(isolated_db):
     assert [c["phone"] for c in matched] == ["+19990000005"]
 
 
-def test_evaluate_rule_no_matches_returns_empty_list(isolated_db):
-    _seed_customer("biz4", "biz4", "+10000000004", "+19990000007", lead_score=10)
+def test_evaluate_rule_no_matches_returns_empty_list(isolated_db, monkeypatch):
+    _seed_customer(monkeypatch, "biz4", "biz4", "+10000000004", "+19990000007", lead_score=10)
 
     rule = {
         "name": "impossible",
@@ -168,7 +177,7 @@ def test_evaluate_rule_accepts_a_prefetched_customer_list(isolated_db, monkeypat
     # evaluate_rule() re-fetching it internally for every single rule -
     # passing `customers` explicitly must skip the internal fetch
     # entirely (not just override its result).
-    _seed_customer("biz5", "biz5", "+10000000005", "+19990000008", lead_score=90, status="Qualified")
+    _seed_customer(monkeypatch, "biz5", "biz5", "+10000000005", "+19990000008", lead_score=90, status="Qualified")
 
     def _fail_if_called(user_id):
         raise AssertionError(
