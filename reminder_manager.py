@@ -75,17 +75,35 @@ def init_reminders():
 def get_reminder_customer_phone(reminder_id):
     """
     Which customer_phone a reminder id belongs to, or None if it doesn't
-    exist. Used by api/reminders.py's POST /reminders/{id}/complete to
-    authorize the request (via auth.enforce_tenant_access_for_customer())
-    before mutating a reminder - a reminder id alone doesn't say which
-    business owns it, so this resolves that first.
+    exist *or* doesn't belong to this deployment's own business. Used by
+    api/reminders.py's POST /reminders/{id}/complete to authorize the
+    request before mutating a reminder - a reminder id alone doesn't say
+    which business owns it, so this resolves that first.
+
+    Filters on business_id = config.BUSINESS_ID directly (this
+    deployment's own, authoritative, write-time-stamped scope - see
+    migrations/add_business_id_to_crm_tables.py's module docstring), not
+    just `id`. This used to be unscoped, relying entirely on the route's
+    follow-up enforce_tenant_access_for_customer() call for protection -
+    but that check resolves ownership through customer_mapping's
+    *mutable* customer_phone -> business_phone pointer, the same
+    mutable-mapping risk this whole migration exists to close (see that
+    module docstring again). If the same phone number had ever contacted
+    two different businesses, customer_mapping would point at whichever
+    business messaged it most recently - so a reminder id belonging to
+    the FIRST business could pass that check once the mapping moved to a
+    SECOND business, letting the second business mark the first
+    business's reminder complete. Filtering here on the immutable
+    business_id closes that regardless of what customer_mapping
+    currently says - a mismatched reminder now returns None (404) before
+    the mutable-mapping check even runs.
     """
 
     conn = get_crm_connection()
 
     row = conn.execute(
-        "SELECT customer_phone FROM reminders WHERE id = ?",
-        (reminder_id,)
+        "SELECT customer_phone FROM reminders WHERE id = ? AND business_id = ?",
+        (reminder_id, config.BUSINESS_ID)
     ).fetchone()
 
     conn.close()
@@ -100,6 +118,12 @@ def complete_reminder(reminder_id):
     reminder at once (e.g. one from each automation rule that fired for
     them) and "Mark Done" on one card should only resolve that card, not
     every reminder for that customer.
+
+    Also filters on business_id = config.BUSINESS_ID, as defense in
+    depth on top of the route-level check (see
+    get_reminder_customer_phone()'s docstring) - this function itself
+    should never touch a row it doesn't own, regardless of what any
+    caller already checked upstream.
     """
 
     conn = get_crm_connection()
@@ -112,8 +136,9 @@ def complete_reminder(reminder_id):
 
         WHERE id=?
         AND completed=0
+        AND business_id=?
         """,
-        (reminder_id,)
+        (reminder_id, config.BUSINESS_ID)
     )
 
     conn.commit()
@@ -258,13 +283,15 @@ def upsert_reminder(
                 source_rule_name=?
 
             WHERE id=?
+            AND business_id=?
             """,
             (
                 reminder_text,
                 due_date,
                 source_rule_id,
                 source_rule_name,
-                row[0]
+                row[0],
+                config.BUSINESS_ID
             )
         )
 
@@ -475,8 +502,8 @@ def delete_stale_reminders():
     conn = get_crm_connection()
 
     conn.executemany(
-        "DELETE FROM reminders WHERE id = ?",
-        [(r["id"],) for r in stale]
+        "DELETE FROM reminders WHERE id = ? AND business_id = ?",
+        [(r["id"], config.BUSINESS_ID) for r in stale]
     )
 
     conn.commit()

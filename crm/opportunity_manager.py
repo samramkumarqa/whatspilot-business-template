@@ -96,12 +96,14 @@ def add_opportunity(
                 estimated_value = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
+            AND business_id = ?
             """,
             (
                 confidence,
                 reason,
                 estimated_value,
-                row[0]
+                row[0],
+                config.BUSINESS_ID
             )
         )
 
