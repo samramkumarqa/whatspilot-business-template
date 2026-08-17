@@ -10,10 +10,8 @@ from config import (
     TWILIO_AUTH_TOKEN,
     BUSINESS_ID,
 )
-import os
 import logging
 logger = logging.getLogger(__name__)
-DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 from twilio.request_validator import RequestValidator
 validator = RequestValidator(TWILIO_AUTH_TOKEN)
 

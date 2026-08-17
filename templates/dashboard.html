@@ -5782,9 +5782,6 @@ async function loadAutomationRules() {
 
 async function editRule(ruleId, buttonEl) {
 
-    console.log("Editing rule:", ruleId);
-    console.count("editRule called");
-
     const userId = document.getElementById("userId").value;
 
     const response = await fetch(`/automation/rules/${userId}`);
@@ -5846,26 +5843,17 @@ async function editRule(ruleId, buttonEl) {
         document.getElementById("conditionBuilder");
 
     builder.innerHTML = "";
-    console.log("After clear:", builder.innerHTML);
-    console.log("Rows:", builder.querySelectorAll(".condition-row").length);
 
     const conditions = Array.isArray(rule.condition_json)
         ? rule.condition_json
         : [rule.condition_json];
-    console.log("Condition JSON:", rule.condition_json);
-    console.log("Conditions array:", conditions);
-    console.log("Conditions length:", conditions.length);
+
     conditions.forEach(condition => {
 
         builder.insertAdjacentHTML(
             "beforeend",
             buildConditionRowHTML(condition)
         );
-
-            console.log(
-                "Final Rows:",
-                builder.querySelectorAll(".condition-row").length
-            );
     });
 
     //
@@ -6206,10 +6194,6 @@ updateRuleSummary();
 }
 
 function populateRuleForm(rule){
-
-    console.log("Rule Loaded");
-
-    console.log(rule);
 
 }
 
@@ -6827,8 +6811,6 @@ async function saveRule() {
 
         };
         updateRuleSummary();
-        console.log("Saving Payload");
-        console.log(payload);
 
         const isNewRule = !window.currentEditingRule;
 
@@ -6885,8 +6867,6 @@ async function saveRule() {
             return;
 
         }
-
-        console.log(result);
 
         alert(
             isNewRule
@@ -7982,12 +7962,7 @@ async function saveLead(){
 
     const data =
         await response.json();
-    console.log(
-        "Saving:",
-        currentCustomer,
-        status
-    );
-    
+
     await loadLead(currentCustomer);
 
     // A manual save writes both a lead_history row and a "Manual"
@@ -8015,7 +7990,6 @@ async function loadLead(
 
     const data =
         await response.json();
-    console.log("Lead loaded", data);
     document.getElementById(
         "leadStatus"
     ).value =
@@ -8160,8 +8134,6 @@ async function loadCustomerProfile(customerPhone) {
     );
 
     const data = await response.json();
-
-    console.log("Customer Profile API:", data);
 
     const profile = data.profile || {};
 
