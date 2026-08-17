@@ -203,6 +203,21 @@ def save_rule(
 ):
     """
     Save a new automation rule.
+
+    WARNING - do not call save_rule()/create_rule()/update_rule()/
+    delete_rule() below from any api/*.py route or other application code
+    that handles untrusted input: unlike automation/manager.py's
+    same-named create_rule()/update_rule()/delete_rule() (what
+    api/automation.py actually calls), these four take business_id purely
+    as an optional/unchecked value and update_rule()/delete_rule() below
+    don't filter their UPDATE/DELETE on business_id at all - just a bare
+    `WHERE id=?`. Safe for what they're used for today (this module's own
+    one-time backfill, and tests that intentionally want low-level,
+    unscoped access to set up multi-business fixtures), but they would
+    reproduce the exact cross-tenant bug already fixed once in
+    reminder_manager.py's complete_reminder() if ever wired up to a real
+    route. Use automation/manager.py's versions for anything reachable
+    from an HTTP request.
     """
 
     conn = get_connection()
