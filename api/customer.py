@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Request
 from fastapi.concurrency import run_in_threadpool
 
@@ -145,15 +147,24 @@ async def conversation_view(
         f"{business_id}:{customer_phone}"
     )
 
-    await run_in_threadpool(clear_unread, conversation_id)
+    # clear_unread() and get_conversation() are independent of each other
+    # (one resets a counter, the other reads messages) - run concurrently
+    # instead of one-after-the-other. business_id is passed straight
+    # through to get_conversation() so it doesn't redo the same
+    # customer_numbers lookup already done above.
+    _, messages = await asyncio.gather(
+        run_in_threadpool(clear_unread, conversation_id),
+        run_in_threadpool(
+            get_conversation,
+            user_id,
+            customer_phone,
+            business_id
+        )
+    )
 
     return {
         "status": "success",
-        "messages": await run_in_threadpool(
-            get_conversation,
-            user_id,
-            customer_phone
-        )
+        "messages": messages
     }
 
 

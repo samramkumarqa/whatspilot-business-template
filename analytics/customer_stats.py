@@ -347,10 +347,18 @@ def search_customers(user_id, query):
 
 def get_conversation(
     user_id,
-    customer_phone
+    customer_phone,
+    business_id=None
 ):
 
-    business_id = get_business_id(user_id)
+    # business_id is optional - most callers only have user_id, so it's
+    # resolved here same as before. api/customer.py's conversation_view()
+    # route already resolves business_id itself (needed separately for
+    # clear_unread()) and passes it straight through, skipping what would
+    # otherwise be a second identical customer_numbers lookup on every
+    # single conversation click.
+    if business_id is None:
+        business_id = get_business_id(user_id)
 
     if not business_id:
         return []
