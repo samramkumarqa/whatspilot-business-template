@@ -248,6 +248,14 @@ button:disabled {
   cursor: not-allowed;
 }
 
+input:read-only {
+  background: var(--color-gray-50);
+
+  color: var(--color-gray-500);
+
+  cursor: default;
+}
+
 button:disabled:hover {
   background: var(--color-gray-50);
   transform: none;
@@ -514,17 +522,27 @@ textarea.field-invalid {
     <!-- User Settings -->
     <!-- ========================= -->
 
-    <label>WhatsApp Number</label>
+    <label>Logged in as</label>
 
+    <!-- This is your login identity (the number you used for OTP login),
+         NOT your business's outbound WhatsApp number - that's configured
+         separately via Twilio/provisioning, not here. It's also what every
+         action on this page (add website, save settings, reindex) sends
+         as the user_id to identify your business - read-only because
+         editing it can't actually change anything (the backend checks
+         your real session, not this field - see auth.py's
+         enforce_tenant_access) and would just cause confusing 403s. -->
     <input
         id="userId"
         value="{{ user_id or '' }}"
-        placeholder="+14155238886"
+        readonly
         maxlength="16"
         inputmode="tel"
-        oninput="sanitizePhoneInput(this)"
     >
     <div id="userIdError" class="field-error"></div>
+    <p style="color:var(--color-gray-600); font-size:13px; margin:-8px 0 16px;">
+        This is your login number and can't be changed here.
+    </p>
 
     <label>Website URL</label>
 
@@ -717,20 +735,6 @@ function updateCharCounter(fieldId) {
 
     counter.textContent = `${len}/${max}`;
     counter.classList.toggle("char-counter-limit", len >= max);
-
-}
-
-// WhatsApp Number: digits only, with an optional single leading "+" -
-// strips letters, spaces, and punctuation as they're typed rather than
-// only complaining after the fact.
-function sanitizePhoneInput(el) {
-
-    const hasLeadingPlus = el.value.startsWith("+");
-    const digits = el.value.replace(/[^0-9]/g, "");
-
-    el.value = (hasLeadingPlus ? "+" : "") + digits;
-
-    clearFieldError("userId");
 
 }
 
