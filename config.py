@@ -10,6 +10,17 @@ load_dotenv()
 
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
+# Load testing only (see load_test_webhook.py) - when set, api/webhook.py
+# skips the real outbound Twilio send at the end of the pipeline instead
+# of actually calling the WhatsApp API. Everything else in the request
+# (DB writes, RAG/Groq call, lead intelligence) still runs for real, so
+# latency numbers reflect this app's own work rather than Twilio's send
+# API and rate limits - and repeated local load-test runs don't spam
+# real (and likely invalid/un-opted-in) numbers through the shared
+# Twilio account. Never set this in production - it's not read anywhere
+# except that one call site, and defaults to off.
+LOAD_TEST_MODE = os.getenv("LOAD_TEST_MODE", "false").lower() == "true"
+
 # ----------------------------------------
 # This deployment's business
 # ----------------------------------------

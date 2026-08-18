@@ -9,6 +9,7 @@ from config import (
     DEBUG,
     TWILIO_AUTH_TOKEN,
     BUSINESS_ID,
+    LOAD_TEST_MODE,
 )
 import logging
 logger = logging.getLogger(__name__)
@@ -395,10 +396,19 @@ async def receive_message(
         # Send WhatsApp Reply
         # -----------------------------
         try:
-            await send_message(
-                from_number,
-                reply
-            )
+            if LOAD_TEST_MODE:
+                # See config.py's LOAD_TEST_MODE docstring - skips the
+                # real Twilio API call so load-test runs measure this
+                # app's own latency, not Twilio's, and don't spam
+                # synthetic numbers through the real account.
+                logger.info(
+                    "LOAD_TEST_MODE - skipping real send to %s", from_number
+                )
+            else:
+                await send_message(
+                    from_number,
+                    reply
+                )
         except Exception as e:
             # The reply was already saved to conversation history and fed
             # into refresh_customer_intelligence() above, so without this
