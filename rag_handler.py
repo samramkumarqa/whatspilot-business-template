@@ -1,8 +1,10 @@
+import asyncio
+
 from groq import AsyncGroq
 import logging
 
 from config import GROQ_API_KEY
-from vector_store import get_retriever
+from vector_store import get_retriever, get_user_lock
 from crm.customer_mapping import (
     get_business_settings,
 )
@@ -10,6 +12,26 @@ from crm.customer_mapping import (
 logger = logging.getLogger(__name__)
 
 client = AsyncGroq(api_key=GROQ_API_KEY)
+
+
+def _retrieve_docs(user_id, query):
+    """
+    Synchronous Chroma read, run off the event loop via asyncio.to_thread
+    below - both because retriever.invoke() is a blocking call that would
+    otherwise stall every other concurrent request on this deployment,
+    and so the per-user lock (see vector_store.py) can safely block this
+    worker thread without freezing the whole app if it lands while a
+    background reindex is mid-write.
+    """
+
+    with get_user_lock(user_id):
+
+        retriever = get_retriever(user_id)
+
+        if retriever is None:
+            return None
+
+        return retriever.invoke(query)
 
 
 def build_query(user_message: str, history=None) -> str:
@@ -62,9 +84,13 @@ async def handle_rag(
 
         logger.info(f"RAG Query: {query}")
 
-        retriever = get_retriever(user_id)
+        docs = await asyncio.to_thread(
+            _retrieve_docs,
+            user_id,
+            query,
+        )
 
-        if retriever is None:
+        if docs is None:
 
             logger.error(
                 "Retriever is None - vector store not initialized"
@@ -73,8 +99,6 @@ async def handle_rag(
             return (
                 "No knowledge base found for this user."
             )
-
-        docs = retriever.invoke(query)
 
         logger.info(
             f"Retrieved {len(docs)} documents"

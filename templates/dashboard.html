@@ -6392,7 +6392,7 @@ function getConversationSection(lastSeen){
     if(!lastSeen)
         return "Older";
 
-    const date = new Date(lastSeen);
+    const date = parseServerTimestamp(lastSeen);
 
     const today = new Date();
 
@@ -7186,12 +7186,37 @@ async function selectCustomer(customerPhone){
     ]);
 }
 
+// Backend timestamps (Postgres TIMESTAMP columns, no time zone) come back
+// as naive "YYYY-MM-DD HH:MM:SS" strings representing UTC wall-clock time
+// (Render Postgres's session default - see database/db.py's
+// _timestamp_as_sqlite_style_string(), which strips native datetimes down
+// to plain strings with no timezone indicator at all). Passing a string
+// like that straight into `new Date()` makes the browser parse it as
+// LOCAL time instead of UTC, silently shifting every timestamp by however
+// far the viewer is from UTC (~5.5h for IST) - a message sent seconds ago
+// would show as "Last seen 5h" and never count as "Active Now". Appending
+// "Z" (after normalizing the space to "T") forces correct UTC parsing;
+// strings that already carry timezone info are left untouched.
+function parseServerTimestamp(dateString){
+
+    if(!dateString)
+        return null;
+
+    const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(dateString);
+
+    const isoish = dateString.includes("T")
+        ? dateString
+        : dateString.replace(" ", "T");
+
+    return new Date(hasTimezone ? isoish : isoish + "Z");
+}
+
 function formatTime(dateString){
 
     if(!dateString)
         return "";
 
-    const date = new Date(dateString);
+    const date = parseServerTimestamp(dateString);
 
     const now = new Date();
 
@@ -7248,7 +7273,7 @@ function isOnlineNow(lastSeen){
         return false;
 
     const diffMinutes =
-        (new Date() - new Date(lastSeen)) / 60000;
+        (new Date() - parseServerTimestamp(lastSeen)) / 60000;
 
     return diffMinutes >= 0 && diffMinutes < ONLINE_THRESHOLD_MINUTES;
 

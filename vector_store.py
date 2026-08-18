@@ -1,4 +1,5 @@
 import os
+import threading
 import logging
 
 from config import CHROMA_DB
@@ -7,6 +8,33 @@ logger = logging.getLogger(__name__)
 
 
 _embeddings = None
+
+# Chroma's default local persistent backend isn't safe for two separate
+# Chroma client instances to hit the same on-disk persist_dir at once -
+# incremental_ingest.py (background reindex, runs in its own thread) and
+# rag_handler.py (a live customer query, runs in its own thread too - see
+# _retrieve_docs()) each construct a fresh Chroma(...) via
+# get_user_vectorstore() below. Without serializing them, a query that
+# lands while a reindex is mid-write throws (typically a sqlite "database
+# is locked" style error from Chroma's backing store), which
+# rag_handler.py's broad except Exception turns into "Sorry, I am unable
+# to access the knowledge base right now." - exactly what happened right
+# after a website was first added, while its initial background index
+# was still running. One lock per business (not global) so concurrent
+# indexing/querying for *different* businesses on the same deployment
+# still runs in parallel.
+_user_locks = {}
+_user_locks_guard = threading.Lock()
+
+
+def get_user_lock(user_id: str) -> threading.Lock:
+
+    with _user_locks_guard:
+
+        if user_id not in _user_locks:
+            _user_locks[user_id] = threading.Lock()
+
+        return _user_locks[user_id]
 
 
 class _FastEmbedEmbeddings:
