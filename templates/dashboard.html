@@ -7698,7 +7698,7 @@ function scrollConversation(force=false){
 }
 
 
-async function loadConversation(customerPhone) {
+async function loadConversation(customerPhone, forceScroll=true) {
 
     currentCustomer = customerPhone;
 
@@ -7756,7 +7756,13 @@ async function loadConversation(customerPhone) {
 
     });
 
-    scrollConversation(true);
+    // A deliberate customer selection (or after sending a reply) always
+    // jumps to the bottom - but a background poll picking up a new
+    // incoming message shouldn't yank the view out from under someone
+    // who's scrolled up reading older messages. scrollConversation()'s
+    // own near-bottom check (distance<150) handles that when
+    // forceScroll is false - see checkConversationUpdates() below.
+    scrollConversation(forceScroll);
 
     // Enable the reply box now that a real conversation is loaded -
     // matches sendManualReply()'s own currentCustomer guard, but also
@@ -9013,7 +9019,45 @@ window.onload = async function () {
         </div>
     `;
 
+    // checkCustomerUpdates()/checkConversationUpdates() (below) were
+    // already built - cheap hash/timestamp-only endpoints designed
+    // exactly for polling - but nothing ever actually called them, so
+    // the inbox list and an open conversation only ever refreshed on a
+    // full page reload or re-clicking the customer. Wiring them into a
+    // recurring poll here is what makes new WhatsApp messages actually
+    // show up on their own.
+    setInterval(pollDashboardUpdates, 5000);
+
 };
+
+let dashboardPollInFlight = false;
+
+async function pollDashboardUpdates(){
+
+    // Guards against overlapping ticks if a request is still in flight
+    // when the next one would fire (e.g. a slow Render free-tier
+    // response) - skips that tick rather than piling up requests.
+    if(dashboardPollInFlight)
+        return;
+
+    dashboardPollInFlight = true;
+
+    try {
+
+        await checkCustomerUpdates();
+        await checkConversationUpdates();
+
+    } catch(e){
+
+        console.error("Dashboard poll", e);
+
+    } finally {
+
+        dashboardPollInFlight = false;
+
+    }
+
+}
 
 function showTypingIndicator(){
 
@@ -9285,7 +9329,10 @@ async function checkConversationUpdates(){
 
         lastConversationHash = data.last_message;
 
-        await loadConversation(currentCustomer);
+        // false = don't force-scroll to bottom here; only jump down if
+        // the viewer was already near the bottom (see loadConversation's
+        // forceScroll param / scrollConversation's near-bottom check).
+        await loadConversation(currentCustomer, false);
 
     }
 
