@@ -66,7 +66,9 @@ Example:
     try:
 
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            # llama-3.3-70b-versatile was shut down by Groq on 08/16/26 -
+            # see llm.py's MODEL constant for the full explanation.
+            model="openai/gpt-oss-120b",
             messages=[
                 {
                     "role": "user",
