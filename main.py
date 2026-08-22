@@ -30,6 +30,7 @@ from api.customer import router as customer_router
 from automation.service import initialize_scheduler
 from automation.database import init_automation_db
 from automation.rule_stats import init_rule_executions
+from vector_store import init_website_index
 from api.automation import router as automation_router
 from api.reminders import router as reminders_router
 from api.auth import router as auth_router
@@ -87,6 +88,10 @@ init_followups()
 init_unread()
 init_automation_db()
 init_rule_executions()
+# Deliberately never crashes app boot even if this fails (e.g. the
+# vector extension isn't enabled yet) - see its own docstring in
+# vector_store.py.
+init_website_index()
 
 @app.on_event("startup")
 async def startup():

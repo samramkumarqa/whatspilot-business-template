@@ -4,10 +4,11 @@ from groq import AsyncGroq
 import logging
 
 from config import GROQ_API_KEY
-from vector_store import get_retriever, get_user_lock
+from vector_store import similarity_search, get_user_lock
 from crm.customer_mapping import (
     get_business_settings,
 )
+from website_manager import get_websites
 
 logger = logging.getLogger(__name__)
 
@@ -16,22 +17,17 @@ client = AsyncGroq(api_key=GROQ_API_KEY)
 
 def _retrieve_docs(user_id, query):
     """
-    Synchronous Chroma read, run off the event loop via asyncio.to_thread
-    below - both because retriever.invoke() is a blocking call that would
-    otherwise stall every other concurrent request on this deployment,
-    and so the per-user lock (see vector_store.py) can safely block this
-    worker thread without freezing the whole app if it lands while a
+    Synchronous Postgres read, run off the event loop via asyncio.to_thread
+    below - both because it's a blocking DB call that would otherwise
+    stall every other concurrent request on this deployment, and so the
+    per-user lock (see vector_store.py) can safely block this worker
+    thread without freezing the whole app if it lands while a
     background reindex is mid-write.
     """
 
     with get_user_lock(user_id):
 
-        retriever = get_retriever(user_id)
-
-        if retriever is None:
-            return None
-
-        return retriever.invoke(query)
+        return similarity_search(user_id, query, k=5, fetch_k=20)
 
 
 def build_query(user_message: str, history=None) -> str:
@@ -90,21 +86,28 @@ async def handle_rag(
             query,
         )
 
-        if docs is None:
-
-            logger.error(
-                "Retriever is None - vector store not initialized"
-            )
-
-            return (
-                "No knowledge base found for this user."
-            )
-
         logger.info(
             f"Retrieved {len(docs)} documents"
         )
 
         if not docs:
+
+            # Distinguishes "nothing indexed at all" from "indexed, but
+            # nothing relevant matched this question" - the same two
+            # messages this branch always returned, just now driven by
+            # a real check instead of a retriever-is-None sentinel that
+            # doesn't exist anymore now that website_chunks is a
+            # regular Postgres table (it always "exists", even empty).
+            has_website = await asyncio.to_thread(
+                get_websites,
+                user_id,
+            )
+
+            if not has_website:
+
+                return (
+                    "No knowledge base found for this user."
+                )
 
             return (
                 "I could not find relevant information "
@@ -112,7 +115,7 @@ async def handle_rag(
             )
 
         context = "\n\n".join(
-            doc.page_content
+            doc["content"]
             for doc in docs
         )
 
@@ -120,7 +123,7 @@ async def handle_rag(
 
         for doc in docs:
 
-            src = doc.metadata.get(
+            src = doc.get(
                 "source",
                 "Unknown Source",
             )

@@ -93,6 +93,7 @@ def isolated_db(monkeypatch):
     from unread_manager import init_unread
     from automation.database import init_automation_db
     from automation.rule_stats import init_rule_executions
+    from vector_store import init_website_index
 
     init_customer_mapping()
     init_business_settings()
@@ -106,6 +107,7 @@ def isolated_db(monkeypatch):
     init_unread()
     init_automation_db()
     init_rule_executions()
+    init_website_index()
 
     yield
 

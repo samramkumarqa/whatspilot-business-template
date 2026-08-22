@@ -73,14 +73,6 @@ SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # ----------------------------------------
-# Vector Database
-# ----------------------------------------
-# Overridable via CHROMA_DB_PATH so production can point this at a
-# persistent disk mount instead of the repo-relative default used locally.
-
-CHROMA_DB = os.getenv("CHROMA_DB_PATH", "./chroma_db")
-
-# ----------------------------------------
 # Logging
 # ----------------------------------------
 

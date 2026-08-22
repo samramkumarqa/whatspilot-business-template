@@ -1,20 +1,16 @@
-import os
-from urllib.parse import urlparse
-from pathlib import Path
+from database.db import get_crm_connection
 
-BASE_DIR = Path(__file__).resolve().parent
-
-WEBSITE_DIR = BASE_DIR / "data" / "websites"
-
-os.makedirs(
-    WEBSITE_DIR,
-    exist_ok=True
-)
+# Used to live on local disk (data/websites/{user_id}.txt) - moved to
+# Postgres's indexed_websites table (see
+# vector_store.init_website_index()) so the configured website URL
+# survives Render's free-tier restarts, same reason doc_tracker.py and
+# vector_store.py moved.
 
 # Each business's AI assistant is only meant to answer from one site's
 # indexed content - allowing more than one silently mixes two businesses'
 # knowledge bases into a single AI reply with no way to tell them apart.
 MAX_WEBSITES_PER_USER = 1
+
 
 def normalize_url(url):
 
@@ -28,22 +24,21 @@ def normalize_url(url):
 
 def get_websites(user_id):
 
-    website_file = get_user_file(user_id)
+    conn = get_crm_connection()
 
-    if not os.path.exists(website_file):
-        return []
+    try:
 
-    with open(
-        website_file,
-        "r",
-        encoding="utf-8"
-    ) as f:
+        rows = conn.execute(
+            "SELECT url FROM indexed_websites "
+            "WHERE user_id = ? ORDER BY created_at",
+            (user_id,)
+        ).fetchall()
 
-        return [
-            normalize_url(line)
-            for line in f.readlines()
-            if line.strip()
-        ]
+    finally:
+        conn.close()
+
+    return [row[0] for row in rows]
+
 
 def add_website(user_id, url):
     """
@@ -70,42 +65,42 @@ def add_website(user_id, url):
     if len(websites) >= MAX_WEBSITES_PER_USER:
         return "limit_reached"
 
-    website_file = get_user_file(user_id)
+    conn = get_crm_connection()
 
-    with open(
-        website_file,
-        "a",
-        encoding="utf-8"
-    ) as f:
+    try:
 
-        f.write(url + "\n")
+        conn.execute(
+            "INSERT INTO indexed_websites (user_id, url) VALUES (?, ?) "
+            "ON CONFLICT (user_id, url) DO NOTHING",
+            (user_id, url)
+        )
+
+        conn.commit()
+
+    finally:
+        conn.close()
 
     return "added"
+
 
 def delete_website(user_id, url):
 
     url = normalize_url(url)
 
-    websites = get_websites(user_id)
+    conn = get_crm_connection()
 
-    if url not in websites:
-        return False
+    try:
 
-    websites.remove(url)
+        cursor = conn.execute(
+            "DELETE FROM indexed_websites WHERE user_id = ? AND url = ?",
+            (user_id, url)
+        )
 
-    website_file = get_user_file(user_id)
+        removed = cursor.rowcount > 0
 
-    with open(
-        website_file,
-        "w",
-        encoding="utf-8"
-    ) as f:
+        conn.commit()
 
-        for site in websites:
-            f.write(site + "\n")
+    finally:
+        conn.close()
 
-    return True
-
-def get_user_file(user_id):
-
-    return WEBSITE_DIR / f"{user_id}.txt"
+    return removed

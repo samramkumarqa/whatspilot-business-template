@@ -1,68 +1,56 @@
-import os
-import json
-import hashlib
-from datetime import datetime
+from database.db import get_crm_connection
 
-TRACKER_DIR = "data/doc_registry"
-
-
-def _get_user_file(user_id: str):
-    os.makedirs(TRACKER_DIR, exist_ok=True)
-    return os.path.join(TRACKER_DIR, f"{user_id}.json")
-
-
-def load_registry(user_id: str):
-    path = _get_user_file(user_id)
-
-    if not os.path.exists(path):
-        return {}
-
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_registry(user_id: str, data: dict):
-    path = _get_user_file(user_id)
-
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-
-def get_hash(content: str) -> str:
-    return hashlib.md5(content.encode("utf-8")).hexdigest()
+# Used to live on local disk (data/doc_registry/{user_id}.json) - moved
+# to Postgres's indexed_pages table (see vector_store.init_website_index())
+# so this survives Render's free-tier restarts. Function names/signatures
+# are unchanged so incremental_ingest.py and api/website.py didn't need
+# to change at all.
 
 
 def update_doc(user_id, url, content_hash, chunk_count):
 
-    path = _path(user_id)
+    conn = get_crm_connection()
 
-    if os.path.exists(path):
-        with open(path, "r") as f:
-            data = json.load(f)
-    else:
-        data = {}
+    try:
 
-    data[url] = {
-        "hash": content_hash,
-        "chunk_count": chunk_count
-    }
+        conn.execute(
+            """
+            INSERT INTO indexed_pages
+                (user_id, url, content_hash, chunk_count, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id, url) DO UPDATE SET
+                content_hash = EXCLUDED.content_hash,
+                chunk_count = EXCLUDED.chunk_count,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (user_id, url, content_hash, chunk_count)
+        )
 
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+        conn.commit()
+
+    finally:
+        conn.close()
+
 
 def is_changed(user_id, url, new_hash):
 
-    path = _path(user_id)
+    conn = get_crm_connection()
 
-    if not os.path.exists(path):
+    try:
+
+        row = conn.execute(
+            "SELECT content_hash FROM indexed_pages "
+            "WHERE user_id = ? AND url = ?",
+            (user_id, url)
+        ).fetchone()
+
+    finally:
+        conn.close()
+
+    if not row:
         return True  # first time always index
 
-    with open(path, "r") as f:
-        data = json.load(f)
-
-    old = data.get(url, {}).get("hash")
-
-    return old != new_hash
+    return row[0] != new_hash
 
 
 def get_indexed_pages(user_id):
@@ -72,18 +60,23 @@ def get_indexed_pages(user_id):
     Settings page's "pages indexed" list is built from.
     """
 
-    registry = load_registry(user_id)
+    conn = get_crm_connection()
 
-    return sorted(
-        (
-            {
-                "url": url,
-                "chunk_count": info.get("chunk_count", 0)
-            }
-            for url, info in registry.items()
-        ),
-        key=lambda page: page["url"]
-    )
+    try:
+
+        rows = conn.execute(
+            "SELECT url, chunk_count FROM indexed_pages "
+            "WHERE user_id = ? ORDER BY url",
+            (user_id,)
+        ).fetchall()
+
+    finally:
+        conn.close()
+
+    return [
+        {"url": row[0], "chunk_count": row[1]}
+        for row in rows
+    ]
 
 
 def clear_registry(user_id):
@@ -93,9 +86,16 @@ def clear_registry(user_id):
     pages from a site that's no longer configured.
     """
 
-    save_registry(user_id, {})
+    conn = get_crm_connection()
 
+    try:
 
-def _path(user_id):
-    os.makedirs("data/doc_registry", exist_ok=True)
-    return f"data/doc_registry/{user_id}.json"
+        conn.execute(
+            "DELETE FROM indexed_pages WHERE user_id = ?",
+            (user_id,)
+        )
+
+        conn.commit()
+
+    finally:
+        conn.close()
