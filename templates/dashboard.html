@@ -8027,6 +8027,25 @@ async function saveLead(){
 
     await loadLead(currentCustomer);
 
+    // BUG FIX: a manual status/notes save only ever refreshed the
+    // leadStatus/leadNotes fields themselves (via loadLead() above) - the
+    // conversation header's status pill (updateChatHeader(), which reads
+    // from customerCache) and the Customer Information panel's status row
+    // (loadCustomerProfile(), a separate fetch) both kept showing the
+    // status this customer had BEFORE the save, until either a full page
+    // reload or the next 5s poll happened to touch them. The poll never
+    // actually would have: it only re-fetches when conversations.phone's
+    // MAX(created_at) changes (see checkCustomerUpdates()), and saving a
+    // lead writes to the leads table, not conversations - so without this,
+    // nothing would ever refresh those two spots on its own.
+    if(customerCache[currentCustomer]){
+        customerCache[currentCustomer].status = status;
+    }
+
+    updateChatHeader(currentCustomer);
+
+    await loadCustomerProfile(currentCustomer);
+
     // A manual save writes both a lead_history row and a "Manual"
     // ai_activity row (see POST /lead in api/customer.py) - refresh the
     // merged Customer Timeline so it shows up immediately instead of only
