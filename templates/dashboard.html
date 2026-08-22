@@ -8680,8 +8680,16 @@ function createOpportunityCard(opp) {
     // confidence score's actual freshness.
     //---------------------------------------
 
+    // BUG FIX: was rendered straight from the backend (a naive UTC
+    // string) via escapeHtml(updated) below - same class of bug as
+    // Customer Information's First/Last Seen rows (see
+    // formatFullDateTime() above) - so this always showed raw UTC
+    // wall-clock time instead of the viewer's own. formatFullDateTime()
+    // already returns "-" for a falsy/missing value, so the old
+    // `|| "-"` fallback moved out of this raw value (parseServerTimestamp
+    // would otherwise try to parse the literal string "-" as a date).
     const updated =
-        opp.updated_at || opp.created_at || "-";
+        formatFullDateTime(opp.updated_at || opp.created_at || null);
 
     //---------------------------------------
     // HTML
