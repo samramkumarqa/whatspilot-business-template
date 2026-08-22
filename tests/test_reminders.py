@@ -11,6 +11,7 @@ data/app.db (see database/db.py) - the isolated_db fixture initializes
 both, matching the real app.
 """
 
+import config
 from automation.database import create_rule, update_rule, delete_rule
 from automation.actions.create_reminder import execute as create_reminder_action
 from reminder_manager import (
@@ -30,6 +31,18 @@ def _rule(name, text, **overrides):
         "trigger_type": "lead_score",
         "condition_json": [{"field": "lead_score", "operator": ">=", "value": 80}],
         "action_json": [{"name": "create_reminder", "params": {"text": text, "days": 1}}],
+        # automation.database.create_rule() reads business_id straight out
+        # of this dict (unlike automation.manager.create_rule(), which
+        # takes it as a separate argument) - production always goes
+        # through api/automation.py, which resolves and passes a real
+        # business_id, so every real rule has one. Without this, rules
+        # created here would get business_id=NULL, which
+        # close_reengagement_reminders()'s get_rule(rule_id,
+        # business_id=config.BUSINESS_ID) lookup would never match -
+        # not a bug in that scoping (it's the same defense-in-depth
+        # pattern used everywhere else in this codebase), just this
+        # helper not mirroring production's real data shape.
+        "business_id": config.BUSINESS_ID,
     }
     data.update(overrides)
     return create_rule(data)
