@@ -9028,6 +9028,17 @@ window.onload = async function () {
     // show up on their own.
     setInterval(pollDashboardUpdates, 5000);
 
+    // Browsers throttle setInterval in background tabs (Chrome can drop
+    // it to roughly once a minute) - a tab left open but unfocused while
+    // a new WhatsApp message comes in can sit stale well past 5s, only
+    // catching up whenever the browser next lets the timer fire. Polling
+    // immediately the moment the tab becomes visible again closes that
+    // gap without waiting on the throttled interval.
+    document.addEventListener("visibilitychange", () => {
+        if(document.visibilityState === "visible")
+            pollDashboardUpdates();
+    });
+
 };
 
 let dashboardPollInFlight = false;
