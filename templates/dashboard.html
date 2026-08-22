@@ -2465,6 +2465,30 @@ html {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+/* Small inline spinner for buttons (e.g. Save Lead) - same spin as
+   .spinner above, just sized to sit next to button text instead of
+   filling a whole panel. */
+.spinner-inline {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255,255,255,0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+/* Brief highlight so a value that just got updated in place (no popup
+   confirmation anymore) is still noticeable - flashes green, then
+   fades back to normal over 1s. */
+.value-flash {
+  animation: valueFlash 1.1s ease;
+}
+@keyframes valueFlash {
+  0% { background-color: var(--color-success-light); }
+  100% { background-color: transparent; }
+}
 .reminder-item {
   padding: 12px;
 
@@ -4803,7 +4827,7 @@ textarea.field-invalid {
                     <span id="leadNotesCount" class="char-counter">0/1000</span>
                     <div id="leadNotesError" class="field-error"></div>
 
-                    <button onclick="saveLead()">
+                    <button id="saveLeadBtn" onclick="saveLead()">
                         Save Lead
                     </button>
 
@@ -8071,61 +8095,101 @@ async function saveLead(){
 
     clearFieldError("leadNotes");
 
-    const response =
-        await fetch(
-            "/lead",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type":
-                    "application/json"
-                },
-                body: JSON.stringify({
-                    customer_phone:
-                        currentCustomer,
-                    status:
-                        status,
-                    notes:
-                        notes
-                })
-            }
-        );
+    // No more "Lead updated" popup - the button itself shows progress
+    // (spinner while saving, a brief "Saved" state after), and the two
+    // spots that actually display this value update live below instead
+    // of requiring the user to dismiss a dialog first.
+    const saveBtn = document.getElementById("saveLeadBtn");
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = `<span class="spinner-inline"></span>Saving...`;
 
-    const data =
-        await response.json();
+    try {
 
-    await loadLead(currentCustomer);
+        const response =
+            await fetch(
+                "/lead",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                        "application/json"
+                    },
+                    body: JSON.stringify({
+                        customer_phone:
+                            currentCustomer,
+                        status:
+                            status,
+                        notes:
+                            notes
+                    })
+                }
+            );
 
-    // BUG FIX: a manual status/notes save only ever refreshed the
-    // leadStatus/leadNotes fields themselves (via loadLead() above) - the
-    // conversation header's status pill (updateChatHeader(), which reads
-    // from customerCache) and the Customer Information panel's status row
-    // (loadCustomerProfile(), a separate fetch) both kept showing the
-    // status this customer had BEFORE the save, until either a full page
-    // reload or the next 5s poll happened to touch them. The poll never
-    // actually would have: it only re-fetches when conversations.phone's
-    // MAX(created_at) changes (see checkCustomerUpdates()), and saving a
-    // lead writes to the leads table, not conversations - so without this,
-    // nothing would ever refresh those two spots on its own.
-    if(customerCache[currentCustomer]){
-        customerCache[currentCustomer].status = status;
-    }
+        const data =
+            await response.json();
 
-    updateChatHeader(currentCustomer);
+        await loadLead(currentCustomer);
 
-    await loadCustomerProfile(currentCustomer);
+        // BUG FIX: a manual status/notes save only ever refreshed the
+        // leadStatus/leadNotes fields themselves (via loadLead() above) - the
+        // conversation header's status pill (updateChatHeader(), which reads
+        // from customerCache) and the Customer Information panel's status row
+        // (loadCustomerProfile(), a separate fetch) both kept showing the
+        // status this customer had BEFORE the save, until either a full page
+        // reload or the next 5s poll happened to touch them. The poll never
+        // actually would have: it only re-fetches when conversations.phone's
+        // MAX(created_at) changes (see checkCustomerUpdates()), and saving a
+        // lead writes to the leads table, not conversations - so without this,
+        // nothing would ever refresh those two spots on its own.
+        if(customerCache[currentCustomer]){
+            customerCache[currentCustomer].status = status;
+        }
 
-    // A manual save writes both a lead_history row and a "Manual"
-    // ai_activity row (see POST /lead in api/customer.py) - refresh the
-    // merged Customer Timeline so it shows up immediately instead of only
-    // after re-selecting the customer.
-    await loadCustomerTimeline(currentCustomer);
+        updateChatHeader(currentCustomer);
 
-    if(data.status === "success"){
+        await loadCustomerProfile(currentCustomer);
 
-        alert(
-            "Lead updated"
-        );
+        // A manual save writes both a lead_history row and a "Manual"
+        // ai_activity row (see POST /lead in api/customer.py) - refresh the
+        // merged Customer Timeline so it shows up immediately instead of only
+        // after re-selecting the customer.
+        await loadCustomerTimeline(currentCustomer);
+
+        if(data.status === "success"){
+
+            // Fade-flash the two spots that just changed (conversation
+            // header pill + Customer Information status row) so the
+            // update is noticeable without a blocking popup.
+            [
+                "customerStatusBadge",
+                "profileStatus"
+            ].forEach(id => {
+                const el = document.getElementById(id);
+                if(!el) return;
+                el.classList.remove("value-flash");
+                // Force reflow so re-adding the class restarts the
+                // animation even if it was already flashed recently.
+                void el.offsetWidth;
+                el.classList.add("value-flash");
+            });
+
+            saveBtn.innerHTML = "Saved ✓";
+
+        } else {
+
+            saveBtn.innerHTML = "Save failed - retry";
+        }
+
+    } catch(err) {
+
+        saveBtn.innerHTML = "Save failed - retry";
+
+    } finally {
+
+        setTimeout(() => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = "Save Lead";
+        }, 1400);
     }
 }
 
