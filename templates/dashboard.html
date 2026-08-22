@@ -2438,6 +2438,33 @@ html {
 
   padding: 30px;
 }
+/* Shown in conversationViewer the instant a customer is clicked (see
+   selectCustomer()) - selecting a customer fires 6 parallel API calls
+   (lead, profile, timeline, conversation, opportunities, reminders),
+   and the conversation panel used to just sit there showing the
+   previous customer's messages (or the initial placeholder) with no
+   feedback until they all resolved, which read as broken/unresponsive
+   on a slow connection or a Render free-tier cold start. */
+.conversation-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 30px;
+  color: var(--color-gray-500);
+}
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-gray-200);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 .reminder-item {
   padding: 12px;
 
@@ -7175,6 +7202,21 @@ function filterCustomers() {
 async function selectCustomer(customerPhone){
 
     currentCustomer = customerPhone;
+
+    // Runs synchronously (before the first await below), so this shows
+    // instantly on click - selecting a customer fires 6 parallel API
+    // calls (lead, profile, timeline, conversation, opportunities,
+    // reminders), and without this the conversation panel just sat
+    // showing the previous customer's messages (or the initial
+    // placeholder) with zero feedback until they all resolved.
+    // loadConversation() below replaces this with the real messages
+    // once its own fetch resolves.
+    document.getElementById("conversationViewer").innerHTML = `
+        <div class="conversation-loading">
+            <div class="spinner"></div>
+            <div>Loading conversation...</div>
+        </div>
+    `;
 
     await Promise.all([
         loadLead(customerPhone),

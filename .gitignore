@@ -5,3 +5,6 @@ chroma_db/
 *.pyc
 .DS_Store
 backups/
+
+# CRM data backups written by reset_business_data.py - contain real customer PII (names, phone numbers, conversation transcripts), never commit these
+whatspilot_crm_backup_*.json
