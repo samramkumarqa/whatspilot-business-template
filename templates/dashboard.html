@@ -6554,6 +6554,16 @@ async function loadCustomers() {
 
         const customers = data.customers || [];
 
+        // Same fix as loadConversation()'s lastConversationHash - without
+        // this, lastCustomerHash stayed "" until the first poll tick,
+        // which then always saw a false "change" against the real
+        // business-wide last-update value and re-rendered the whole
+        // inbox list again a moment later for no reason.
+        lastCustomerHash = customers.reduce(
+            (max, c) => (c.last_seen && c.last_seen > max) ? c.last_seen : max,
+            ""
+        );
+
         // ----------------------------
         // Render Inbox
         // ----------------------------
@@ -7789,6 +7799,23 @@ async function loadConversation(customerPhone, forceScroll=true) {
 
     const data =
         await response.json();
+
+    // BUG FIX: lastConversationHash used to only ever get set inside
+    // checkConversationUpdates() (the 5s poll) - never here, where the
+    // conversation is actually first loaded (on customer click or
+    // sending a reply). So right after this function finished loading
+    // and rendering, the very next poll tick would compare the real
+    // last-message timestamp against the still-empty "" hash, always
+    // see a "change", and reload+re-render the whole panel again a
+    // moment later even though nothing had actually changed - the
+    // double-blink. Setting it here too means the next poll tick
+    // correctly sees no change and skips that redundant reload.
+    lastConversationHash = data.messages.length
+        ? data.messages.reduce(
+            (max, m) => (m.created_at && m.created_at > max) ? m.created_at : max,
+            ""
+          )
+        : "";
 
     const viewer =
         document.getElementById("conversationViewer");
