@@ -1,4 +1,5 @@
 from database.db import get_conversation_connection, create_index_if_missing
+from crm.customer_mapping import get_business_id
 
 
 def get_connection():
@@ -110,6 +111,24 @@ def clear_history(phone):
     conn.close()
 
 def get_last_customer_update(user_id):
+
+    # BUG FIX: this used to build the lookup key straight from user_id
+    # (f"{user_id}:%"), but every row in `conversations` is actually
+    # keyed by business_id, not user_id - the two only coincide by
+    # accident (see crm/customer_mapping.get_business_id(), which looks
+    # business_id up from customer_numbers as a distinct value). Any
+    # business where they differ got zero rows back, forever - the
+    # dashboard's polling hash (api/settings.py's GET
+    # /customers-last/{user_id}, called every 5s from
+    # checkCustomerUpdates() in dashboard.html) never saw a change and
+    # silently never refreshed the inbox on its own; only a full page
+    # reload (which goes through get_customer_stats(), which does
+    # resolve business_id first) ever showed new messages.
+    business_id = get_business_id(user_id)
+
+    if not business_id:
+        return None
+
     conn = get_conversation_connection()
 
     row = conn.execute(
@@ -118,7 +137,7 @@ def get_last_customer_update(user_id):
         FROM conversations
         WHERE phone LIKE ?
         """,
-        (f"{user_id}:%",)
+        (f"{business_id}:%",)
     ).fetchone()
 
     conn.close()

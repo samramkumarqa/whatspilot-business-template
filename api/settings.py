@@ -151,6 +151,23 @@ async def customers_last(user_id: str, request: Request):
 }
 
 def _fetch_last_message(user_id: str, customer_phone: str):
+
+    # BUG FIX: same class of bug as conversations.get_last_customer_update()
+    # - conversations.phone is keyed by business_id, not user_id, so
+    # building the lookup key straight from user_id returned nothing for
+    # any business where the two differ. This backs GET
+    # /conversation-last/{user_id}/{customer_phone}, polled every 5s by
+    # checkConversationUpdates() in dashboard.html - with the wrong key,
+    # the hash it read back never matched a real row and never changed,
+    # so an already-open conversation never picked up new messages on
+    # its own; only re-selecting the customer (which reloads through the
+    # real GET /conversation/{user_id}/{customer_phone} route, keyed
+    # correctly by business_id) ever showed them.
+    business_id = get_business_id(user_id)
+
+    if not business_id:
+        return ""
+
     conn = get_conversation_connection()
 
     row = conn.execute(
@@ -159,7 +176,7 @@ def _fetch_last_message(user_id: str, customer_phone: str):
         FROM conversations
         WHERE phone=?
         """,
-        (f"{user_id}:{customer_phone}",)
+        (f"{business_id}:{customer_phone}",)
     ).fetchone()
 
     conn.close()
