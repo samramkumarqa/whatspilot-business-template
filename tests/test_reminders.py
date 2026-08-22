@@ -18,6 +18,7 @@ from reminder_manager import (
     get_customer_reminders,
     find_stale_reminders,
     delete_stale_reminders,
+    close_reengagement_reminders,
 )
 
 
@@ -198,3 +199,84 @@ def test_delete_stale_reminders_removes_only_stale_ones(isolated_db):
 
     # Calling again is a no-op, nothing left to clear.
     assert delete_stale_reminders() == 0
+
+
+# ---------------------------------------------------------------------------
+# close_reengagement_reminders() - auto-closes "customer's gone quiet"
+# reminders once the customer messages in again (see api/webhook.py's call
+# site, right after a new inbound message is saved).
+# ---------------------------------------------------------------------------
+
+def _inactivity_rule(name, text, days=3):
+    return _rule(
+        name, text,
+        trigger_type="last_seen_days",
+        condition_json=[{"field": "last_seen_days", "operator": ">=", "value": days}],
+    )
+
+
+def test_close_reengagement_reminders_closes_inactivity_reminder(isolated_db):
+    rule_id = _inactivity_rule("Gone Quiet", "Customer's gone quiet - send a check-in")
+
+    upsert_reminder(
+        "+19998887777", "Customer's gone quiet - send a check-in", 1,
+        source_rule_id=rule_id, source_rule_name="Gone Quiet",
+    )
+
+    closed_count = close_reengagement_reminders("+19998887777")
+
+    assert closed_count == 1
+    assert get_customer_reminders("+19998887777")[0]["completed"] == 1
+
+
+def test_close_reengagement_reminders_leaves_unrelated_rule_reminder_open(isolated_db):
+    # A rule with no last_seen_days condition (e.g. a lead-score follow-up)
+    # has nothing to do with the customer going quiet - a new message from
+    # them doesn't resolve it.
+    rule_id = _rule("High Value Lead", "VIP Customer Follow-up")
+
+    upsert_reminder(
+        "+19998887777", "VIP Customer Follow-up", 3,
+        source_rule_id=rule_id, source_rule_name="High Value Lead",
+    )
+
+    closed_count = close_reengagement_reminders("+19998887777")
+
+    assert closed_count == 0
+    assert get_customer_reminders("+19998887777")[0]["completed"] == 0
+
+
+def test_close_reengagement_reminders_leaves_reminder_without_source_rule_open(isolated_db):
+    # Manually created / legacy reminders with no source_rule_id have
+    # nothing to check a condition against, so they're left alone rather
+    # than guessed at.
+    upsert_reminder("+19998887777", "Follow up manually", 1)
+
+    closed_count = close_reengagement_reminders("+19998887777")
+
+    assert closed_count == 0
+    assert get_customer_reminders("+19998887777")[0]["completed"] == 0
+
+
+def test_close_reengagement_reminders_scoped_to_the_messaging_customer(isolated_db):
+    rule_id = _inactivity_rule("Gone Quiet", "Customer's gone quiet - send a check-in")
+
+    upsert_reminder(
+        "+19998887777", "Customer's gone quiet - send a check-in", 1,
+        source_rule_id=rule_id, source_rule_name="Gone Quiet",
+    )
+    upsert_reminder(
+        "+11112223333", "Customer's gone quiet - send a check-in", 1,
+        source_rule_id=rule_id, source_rule_name="Gone Quiet",
+    )
+
+    # Only +19998887777 sent a new message - the other customer's
+    # identical reminder must stay open.
+    close_reengagement_reminders("+19998887777")
+
+    assert get_customer_reminders("+19998887777")[0]["completed"] == 1
+    assert get_customer_reminders("+11112223333")[0]["completed"] == 0
+
+
+def test_close_reengagement_reminders_returns_zero_with_nothing_to_close(isolated_db):
+    assert close_reengagement_reminders("+19998887777") == 0

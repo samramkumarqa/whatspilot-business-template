@@ -42,6 +42,7 @@ from ai.lead_intelligence import refresh_customer_intelligence
 from reminder_manager import (
     reminder_exists,
     upsert_reminder,
+    close_reengagement_reminders,
 )
 
 from crm.activity_manager import add_activity
@@ -203,6 +204,24 @@ async def receive_message(
             increment_unread,
             conversation_id
         )
+
+        # This customer just messaged in on their own - auto-close any
+        # open "gone quiet" reminder for them (see
+        # reminder_manager.close_reengagement_reminders()'s docstring for
+        # exactly which reminders qualify). Never allowed to block or
+        # fail the actual message handling below it.
+        try:
+            await run_in_threadpool(
+                close_reengagement_reminders,
+                from_number
+            )
+        except Exception:
+            logger.warning(
+                "close_reengagement_reminders() failed for %s - "
+                "continuing message handling regardless.",
+                from_number,
+                exc_info=True
+            )
 
         # -----------------------------
         # Human Handoff - already paused

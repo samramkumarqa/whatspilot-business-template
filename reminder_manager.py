@@ -488,6 +488,99 @@ def find_stale_reminders():
     return stale
 
 
+def close_reengagement_reminders(customer_phone):
+    """
+    Auto-completes this customer's open reminders that exist specifically
+    because the customer had gone quiet - once they send a new message,
+    the premise behind those reminders ("this customer's gone quiet, send
+    a check-in") is no longer true, so it shouldn't keep sitting there as
+    Overdue telling a team member to check in on someone who already
+    re-engaged on their own.
+
+    Called from api/webhook.py right after a new inbound customer message
+    is saved. Scoped narrowly on purpose: only reminders traceable to a
+    rule (source_rule_id) whose conditions actually include
+    last_seen_days (see api/automation.py's CONDITION_FIELD_CONFIG) are
+    touched - not every open reminder for this customer. A reminder from
+    an unrelated rule (e.g. "lead_score >= 80, send a demo follow-up")
+    stays open even though the same customer just messaged in; that
+    reminder's premise has nothing to do with the customer being quiet,
+    so a new message doesn't resolve it.
+
+    Returns how many reminders were auto-closed, purely so callers can
+    log/observe it - api/webhook.py's caller ignores the return value.
+    """
+
+    conn = get_crm_connection()
+
+    reminders = conn.execute(
+        """
+        SELECT id, source_rule_id
+        FROM reminders
+        WHERE customer_phone = ?
+        AND business_id = ?
+        AND completed = 0
+        AND source_rule_id IS NOT NULL
+        """,
+        (customer_phone, config.BUSINESS_ID)
+    ).fetchall()
+
+    conn.close()
+
+    if not reminders:
+        return 0
+
+    # Imported here rather than at module level purely to avoid every
+    # caller of this module (most of which have nothing to do with
+    # automation rules) paying for automation.manager's import chain -
+    # there's no actual circular-import risk (automation.manager only
+    # depends on automation.database -> database.db).
+    from automation.manager import get_rule
+
+    seen_rule_ids = {}
+    to_close = []
+
+    for reminder in reminders:
+
+        rule_id = reminder["source_rule_id"]
+
+        # A customer can have more than one open "gone quiet" reminder
+        # from the same rule re-firing over time in principle - cache the
+        # lookup per rule_id so this doesn't hit the automation_rules
+        # table once per reminder.
+        if rule_id not in seen_rule_ids:
+            rule = get_rule(rule_id, business_id=config.BUSINESS_ID)
+            seen_rule_ids[rule_id] = (
+                rule is not None and
+                any(
+                    c.get("field") == "last_seen_days"
+                    for c in rule["condition_json"]
+                )
+            )
+
+        if seen_rule_ids[rule_id]:
+            to_close.append(reminder["id"])
+
+    if not to_close:
+        return 0
+
+    conn = get_crm_connection()
+
+    conn.executemany(
+        """
+        UPDATE reminders
+        SET completed = 1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND business_id = ?
+        """,
+        [(reminder_id, config.BUSINESS_ID) for reminder_id in to_close]
+    )
+
+    conn.commit()
+    conn.close()
+
+    return len(to_close)
+
+
 def delete_stale_reminders():
     """
     Deletes every reminder find_stale_reminders() currently flags for this
