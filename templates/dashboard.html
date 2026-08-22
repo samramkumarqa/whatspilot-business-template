@@ -7256,6 +7256,37 @@ function formatTime(dateString){
 
 }
 
+// Customer Information's First Seen/Last Seen rows (loadCustomerProfile()
+// below) used to render profile.first_seen/last_seen straight from the
+// backend - a naive UTC string with no timezone indicator (see
+// parseServerTimestamp() above) - so they always showed raw UTC wall-clock
+// time regardless of the viewer's own timezone. toLocaleString() with no
+// explicit timeZone option always renders in the browser's own system
+// timezone (IST for a browser set to India) - the same mechanism already
+// used correctly elsewhere on this page (formatTime() above), not an
+// IP-based guess, which would be wrong for VPNs/shared networks and is
+// unnecessary when the browser already knows its own timezone.
+function formatFullDateTime(dateString){
+
+    const date = parseServerTimestamp(dateString);
+
+    if(!date)
+        return "-";
+
+    return date.toLocaleString(
+        "en-IN",
+        {
+            day:"numeric",
+            month:"short",
+            year:"numeric",
+            hour:"numeric",
+            minute:"2-digit",
+            hour12:true
+        }
+    );
+
+}
+
 // WhatsApp's Business API doesn't expose real live presence to us - the
 // only signal available is last_seen (the timestamp of a customer's most
 // recent message). "Online" here means "sent a message within the last
@@ -8211,12 +8242,12 @@ async function loadCustomerProfile(customerPhone) {
 
             <div class="health-row">
                 <span>📅 First Seen</span>
-                <strong>${profile.first_seen || "-"}</strong>
+                <strong>${formatFullDateTime(profile.first_seen)}</strong>
             </div>
 
             <div class="health-row">
                 <span>🕒 Last Seen</span>
-                <strong>${profile.last_seen || "-"}</strong>
+                <strong>${formatFullDateTime(profile.last_seen)}</strong>
             </div>
 
             <div class="health-row">
