@@ -29,6 +29,7 @@ from daily_briefing import generate_daily_briefing
 from analytics.customer_stats import (  # noqa: F401
     get_stats,
     get_customer_stats,
+    get_customer_stats_page,
     search_customers,
     get_conversation,
     get_dashboard_metrics,

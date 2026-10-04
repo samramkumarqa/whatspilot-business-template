@@ -76,7 +76,11 @@ def generate_daily_briefing(dashboard):
         for alert in alerts[:3]:
 
             lines.append(
-                f"• {alert['title']}"
+                # analytics/ai_alerts.py emits {"type", "priority",
+                # "message"} - there is no "title" key, so indexing it
+                # raised KeyError and 500'd the whole /dashboard/{user_id}
+                # response for any business with at least one alert.
+                f"• {alert.get('title') or alert.get('type') or alert.get('message')}"
             )
 
     return "\n".join(lines)

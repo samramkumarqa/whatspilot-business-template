@@ -81,6 +81,11 @@ async def receive_message(
     if DEBUG:
         logger.warning("⚠ DEBUG MODE - Twilio validation skipped")
         is_valid = True
+    elif not signature:
+        # No X-Twilio-Signature header at all - reject cleanly with 401
+        # instead of letting validate() raise on a None signature (which
+        # surfaced as a 500).
+        is_valid = False
     else:
         is_valid = validator.validate(
             str(request.url).replace(

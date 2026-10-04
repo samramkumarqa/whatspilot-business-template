@@ -46,6 +46,46 @@ def get_stats(user_id):
 
 
 def get_customer_stats(user_id):
+    """Every customer (unpaged) - used by automation, search and analytics."""
+    customers, _total = _customer_stats(user_id)
+    return customers
+
+
+def get_customer_stats_page(user_id, limit=100, offset=0):
+    """
+    One page of customers, most recently active first, for the inbox.
+    Returns {customers, total, qualified_total, limit, offset, has_more}.
+    total/qualified_total cover ALL customers (the dashboard header
+    numbers used to be computed client-side from the full list, which no
+    longer exists once the list is paged).
+    """
+    limit = max(1, min(int(limit), 1000))
+    offset = max(0, int(offset))
+
+    customers, total = _customer_stats(user_id, limit=limit, offset=offset)
+
+    qualified_total = 0
+    business_id = get_business_id(user_id)
+    if business_id:
+        conn = get_crm_connection()
+        row = conn.execute(
+            "SELECT COUNT(*) FROM leads WHERE business_id = ? AND lead_score >= 80",
+            (business_id,)
+        ).fetchone()
+        conn.close()
+        qualified_total = row[0] if row else 0
+
+    return {
+        "customers": customers,
+        "total": total,
+        "qualified_total": qualified_total,
+        "limit": limit,
+        "offset": offset,
+        "has_more": offset + len(customers) < total,
+    }
+
+
+def _customer_stats(user_id, limit=None, offset=0):
 
     # business_id resolves through its own self-contained crm connection
     # (crm/customer_mapping.get_business_id()) - looked up before opening
@@ -55,7 +95,7 @@ def get_customer_stats(user_id):
     business_id = get_business_id(user_id)
 
     if not business_id:
-        return []
+        return [], 0
 
     conv_conn = get_conversation_connection()
 
@@ -75,15 +115,24 @@ def get_customer_stats(user_id):
 
     rows = cursor.fetchall()
 
+    total = len(rows)
+
+    # Paging: slice BEFORE the per-customer batch lookups below, so the
+    # unread / latest-message / name / lead queries only touch this page.
+    if limit is not None:
+        rows = rows[offset:offset + limit]
+
+    page_conversation_ids = [r[0] for r in rows]
+
     # Batch-fetch unread counts for all conversations in one query instead of
     # opening a new sqlite connection per customer (was an N+1 query pattern).
     unread_cursor = conv_conn.execute(
         """
         SELECT conversation_id, unread_count
         FROM unread_messages
-        WHERE conversation_id LIKE ?
+        WHERE conversation_id = ANY(?)
         """,
-        (f"{business_id}:%",)
+        (page_conversation_ids,)
     )
 
     unread_by_conversation = {
@@ -104,12 +153,12 @@ def get_customer_stats(user_id):
         INNER JOIN (
             SELECT phone, MAX(id) as max_id
             FROM conversations
-            WHERE phone LIKE ?
+            WHERE phone = ANY(?)
             GROUP BY phone
         ) latest
         ON c.phone = latest.phone AND c.id = latest.max_id
         """,
-        (f"{business_id}:%",)
+        (page_conversation_ids,)
     )
 
     last_message_by_conversation = {
@@ -274,7 +323,7 @@ def get_customer_stats(user_id):
 
         })
 
-    return customers
+    return customers, total
 
 
 def search_customers(user_id, query):

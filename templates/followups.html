@@ -499,13 +499,19 @@ async function loadAllReminders() {
     if (!userId) return;
 
     const response =
-        await fetch(`/reminders?user_id=${encodeURIComponent(userId)}`);
+        await fetch(`/reminders?user_id=${encodeURIComponent(userId)}&limit=1000`);
 
     const data =
         await response.json();
 
     const reminders =
         data.reminders || [];
+
+    // Soonest-due first, capped at 1000 per request - if a business has
+    // more active reminders than that, say so instead of silently
+    // truncating the list.
+    window.__remindersHasMore = !!data.has_more;
+    window.__remindersTotal = data.total || reminders.length;
 
     let allRemindersStaleCount = 0;
 
@@ -674,7 +680,15 @@ async function loadAllReminders() {
         `
         : "";
 
+    const truncatedBar = window.__remindersHasMore
+        ? `<div style="padding:10px 14px;margin-bottom:10px;border-radius:8px;background:#fff8c5;">
+               Showing the 1000 soonest-due of ${window.__remindersTotal} active reminders.
+           </div>`
+        : "";
+
     document.getElementById("allRemindersPanel").innerHTML = `
+
+        ${truncatedBar}
 
         ${staleBar}
 

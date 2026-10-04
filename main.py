@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 
 from middleware import AdminAuthMiddleware
+from security_headers import SecurityHeadersMiddleware
 from api import dashboard
 from conversations import init_db
 from crm.customer_mapping import (
@@ -19,6 +20,7 @@ from crm.tag_manager import init_tags
 from crm.activity_manager import init_activity
 from crm.followup_manager import init_followups
 from unread_manager import init_unread
+from executive_summary import init_executive_summary_cache
 
 from api.dashboard import router as dashboard_router
 from api.webhook import router as webhook_router
@@ -75,6 +77,9 @@ app.add_middleware(
     same_site="lax",
     https_only=not DEBUG,
 )
+# Added last = outermost, so these headers are also on the redirects and
+# 401/403 responses the layers above produce.
+app.add_middleware(SecurityHeadersMiddleware)
 
 init_db()
 init_customer_mapping()
@@ -88,6 +93,7 @@ init_followups()
 init_unread()
 init_automation_db()
 init_rule_executions()
+init_executive_summary_cache()
 # Deliberately never crashes app boot even if this fails (e.g. the
 # vector extension isn't enabled yet) - see its own docstring in
 # vector_store.py.

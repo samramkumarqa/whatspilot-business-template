@@ -6,6 +6,7 @@ from fastapi.concurrency import run_in_threadpool
 from auth import enforce_tenant_access, enforce_tenant_access_for_customer
 from analytics.analytics import (
     get_customer_stats,
+    get_customer_stats_page,
     search_customers,
     get_conversation,
     get_customer_profile,
@@ -95,18 +96,27 @@ class ManualReplyRequest(BaseModel):
 @router.get("/customer-details/{user_id}")
 async def customer_details(
     user_id: str,
-    request: Request
+    request: Request,
+    limit: int = 100,
+    offset: int = 0
 ):
+    """
+    Paged (most recently active first). Previously returned every customer
+    in one response - ~3.5 MB at 10k customers. `customers` is still the
+    key the dashboard reads; total/qualified_total/has_more describe the
+    full set so header counts don't depend on how many pages are loaded.
+    """
 
     enforce_tenant_access(request, user_id)
 
-    return {
-        "status": "success",
-        "customers": await run_in_threadpool(
-            get_customer_stats,
-            user_id
-        )
-    }
+    page = await run_in_threadpool(
+        get_customer_stats_page,
+        user_id,
+        limit,
+        offset
+    )
+
+    return {"status": "success", **page}
 
 @router.get("/customer-search/{user_id}")
 async def customer_search(

@@ -29,6 +29,36 @@ def _reset_rate_limits():
     rate_limit.clear_all()
 
 
+@pytest.fixture(autouse=True)
+def _public_dns_for_fake_hosts(monkeypatch):
+    """
+    url_safety.assert_public_url() (the SSRF guard) resolves hostnames.
+    Tests use made-up public domains like example.com / tatapower.com with
+    requests.get mocked, and CI/sandbox machines may have no DNS at all -
+    so resolve those to a public documentation-range IP instead. IP
+    literals and "localhost" still go through the real resolver so the
+    "internal addresses are blocked" tests exercise real behavior.
+    """
+
+    import ipaddress
+    import socket
+    import url_safety
+
+    real = socket.getaddrinfo
+
+    def fake(host, port, *args, **kwargs):
+        try:
+            ipaddress.ip_address(host)
+            return real(host, port, *args, **kwargs)
+        except ValueError:
+            pass
+        if host == "localhost":
+            return real(host, port, *args, **kwargs)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(url_safety.socket, "getaddrinfo", fake)
+
+
 @pytest.fixture
 def isolated_db(monkeypatch):
     """
@@ -94,6 +124,7 @@ def isolated_db(monkeypatch):
     from automation.database import init_automation_db
     from automation.rule_stats import init_rule_executions
     from vector_store import init_website_index
+    from executive_summary import init_executive_summary_cache
 
     init_customer_mapping()
     init_business_settings()
@@ -107,6 +138,7 @@ def isolated_db(monkeypatch):
     init_unread()
     init_automation_db()
     init_rule_executions()
+    init_executive_summary_cache()
     init_website_index()
 
     yield

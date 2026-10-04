@@ -114,10 +114,12 @@ def init_customer_mapping():
 # BUSINESS REGISTRATION
 # user_id -> business whatsapp number
 # --------------------------------------------------
-def get_customers(user_id):
+def get_customers(user_id, limit=None, offset=0):
+    """All customer phone numbers for a business, or one page of them
+    (stable order by phone) when limit is given."""
 
     conn = get_crm_connection()
-    cursor = conn.execute(
+    sql = (
         """
         SELECT customer_phone
         FROM customer_mapping
@@ -126,9 +128,14 @@ def get_customers(user_id):
             FROM customer_numbers
             WHERE user_id = ?
         )
-        """,
-        (user_id,)
+        ORDER BY customer_phone
+        """
     )
+    params = [user_id]
+    if limit is not None:
+        sql += " LIMIT ? OFFSET ?"
+        params += [int(limit), int(offset)]
+    cursor = conn.execute(sql, tuple(params))
 
     customers = [
         row[0]

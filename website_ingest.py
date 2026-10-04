@@ -1,4 +1,5 @@
 import hashlib
+import requests
 import trafilatura
 
 from langchain_core.documents import Document
@@ -6,6 +7,25 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from site_discovery import discover_site_pages
 from website_manager import get_websites
+from url_safety import assert_public_url, redirect_guard_hook
+
+
+def _fetch_html(url):
+    """
+    Replaces trafilatura.fetch_url(), which would happily fetch internal
+    addresses and follow redirects to them. Same result (HTML text, or
+    None), but guarded by url_safety against SSRF.
+    """
+    assert_public_url(url)
+    response = requests.get(
+        url,
+        timeout=15,
+        headers={"User-Agent": "Mozilla/5.0"},
+        hooks={"response": redirect_guard_hook},
+    )
+    if response.status_code != 200:
+        return None
+    return response.text
 
 
 def get_hash(text: str) -> str:
@@ -55,7 +75,7 @@ def load_website_chunks(user_id):
 
             print(f"🌐 Loading: {url}")
 
-            downloaded = trafilatura.fetch_url(url)
+            downloaded = _fetch_html(url)
 
             if not downloaded:
                 print(f"❌ Failed to fetch: {url}")

@@ -181,6 +181,61 @@ def create_reminder(
     conn.close()
 
 
+def get_reminders_page(limit=200, offset=0):
+    """
+    One page of active reminders (soonest due first) plus totals over ALL
+    active reminders, so the bell badge's overdue count doesn't depend on
+    which page the client has loaded. Returns
+    {reminders, total, overdue_count, limit, offset, has_more}.
+    """
+    limit = max(1, min(int(limit), 1000))
+    offset = max(0, int(offset))
+
+    conn = get_crm_connection()
+
+    totals = conn.execute(
+        """
+        SELECT COUNT(*),
+               COUNT(*) FILTER (WHERE due_date < ?)
+        FROM reminders
+        WHERE completed = 0 AND business_id = ?
+        """,
+        (datetime.now().strftime("%Y-%m-%d"), config.BUSINESS_ID)
+    ).fetchone()
+
+    rows = conn.execute(
+        """
+        SELECT id, customer_phone, reminder_text, due_date, status,
+               source_rule_id, source_rule_name
+        FROM reminders
+        WHERE completed = 0 AND business_id = ?
+        ORDER BY due_date ASC, id ASC
+        LIMIT ? OFFSET ?
+        """,
+        (config.BUSINESS_ID, limit, offset)
+    ).fetchall()
+
+    conn.close()
+
+    reminders = [
+        {
+            "id": r[0], "customer_phone": r[1], "reminder_text": r[2],
+            "due_date": r[3], "status": r[4],
+            "source_rule_id": r[5], "source_rule_name": r[6],
+        }
+        for r in rows
+    ]
+
+    return {
+        "reminders": reminders,
+        "total": totals[0],
+        "overdue_count": totals[1],
+        "limit": limit,
+        "offset": offset,
+        "has_more": offset + len(reminders) < totals[0],
+    }
+
+
 def get_reminders():
     """
     Active (not yet marked done) reminders for this deployment's own

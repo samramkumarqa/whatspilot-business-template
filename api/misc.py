@@ -3,7 +3,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.templating import Jinja2Templates
 
 from auth import enforce_tenant_access, resolve_dashboard_user_id
-from reminder_manager import get_reminders
+from reminder_manager import get_reminders, get_reminders_page
 from crm.lead_manager import get_lead_categories
 from analytics.analytics import (
     get_opportunity_dashboard,
@@ -71,7 +71,7 @@ async def health_check():
     }
 
 @router.get("/reminders")
-async def reminders(user_id: str, request: Request):
+async def reminders(user_id: str, request: Request, limit: int = 200, offset: int = 0):
     """
     Backs the Follow-ups page's global reminder list. Requires user_id
     (the business whose reminders are being requested) and checks it
@@ -86,10 +86,9 @@ async def reminders(user_id: str, request: Request):
 
     enforce_tenant_access(request, user_id)
 
-    return {
-        "status": "success",
-        "reminders": await run_in_threadpool(get_reminders)
-    }
+    page = await run_in_threadpool(get_reminders_page, limit, offset)
+
+    return {"status": "success", **page}
 
 @router.get("/lead-categories")
 async def lead_categories(user_id: str, request: Request):

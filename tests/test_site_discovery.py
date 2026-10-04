@@ -93,7 +93,7 @@ def test_discover_via_sitemap_returns_empty_when_missing():
 
 def test_discover_via_sitemap_follows_sitemap_index():
 
-    def fake_get(url, timeout, headers):
+    def fake_get(url, timeout, headers, **kwargs):
         if url == "https://www.solarrun.in/sitemap.xml":
             return _fake_response(SITEMAP_INDEX_XML)
         if url == "https://www.solarrun.in/sitemap-pages.xml":

@@ -1,6 +1,8 @@
 from bs4 import BeautifulSoup
 import requests
 
+from url_safety import assert_public_url, redirect_guard_hook
+
 from urllib.parse import (
     urljoin,
     urlparse
@@ -60,13 +62,16 @@ def discover_links(
                 f"{url}"
             )
 
+            assert_public_url(url)
+
             response = requests.get(
                 url,
                 timeout=10,
                 headers={
                     "User-Agent":
                     "Mozilla/5.0"
-                }
+                },
+                hooks={"response": redirect_guard_hook},
             )
 
             if response.status_code != 200:

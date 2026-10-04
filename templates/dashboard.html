@@ -6481,6 +6481,9 @@ async function searchCustomers() {
     const data =
         await response.json();
 
+    // Search results are not paged - hide the inbox's Load more button.
+    updateLoadMore(false);
+
     renderCustomers(data.customers);
 }
 
@@ -6564,6 +6567,39 @@ async function loadDashboardMetrics(){
 
 }
 
+let inboxLimit = 100;
+const INBOX_PAGE_SIZE = 100;
+
+function updateLoadMore(hasMore, total) {
+
+    let btn = document.getElementById("loadMoreCustomers");
+
+    if (!hasMore) {
+        if (btn) btn.style.display = "none";
+        return;
+    }
+
+    if (!btn) {
+        btn = document.createElement("button");
+        btn.id = "loadMoreCustomers";
+        btn.type = "button";
+        btn.style.cssText =
+            "width:100%;padding:10px;margin:8px 0;border:1px solid #d0d7de;" +
+            "border-radius:8px;background:#f6f8fa;cursor:pointer;font-weight:600;";
+        btn.onclick = () => {
+            inboxLimit += INBOX_PAGE_SIZE;
+            loadCustomers();
+        };
+        document.getElementById("customerList")
+            .insertAdjacentElement("afterend", btn);
+    }
+
+    btn.style.display = "block";
+    btn.textContent = total
+        ? `Load more customers (showing ${Math.min(inboxLimit, total)} of ${total})`
+        : "Load more customers";
+}
+
 async function loadCustomers() {
 
     const userId = document.getElementById("userId").value;
@@ -6572,11 +6608,19 @@ async function loadCustomers() {
 
     try {
 
-        const response = await fetch(`/customer-details/${userId}`);
+        // Paged: only the first inboxLimit customers (most recently
+        // active first) are fetched; "Load more" below raises the limit.
+        // total / qualified_total describe ALL customers, so the header
+        // numbers stay correct even when the list is only partly loaded.
+        const response = await fetch(
+            `/customer-details/${userId}?limit=${inboxLimit}`
+        );
 
         const data = await response.json();
 
         const customers = data.customers || [];
+
+        updateLoadMore(!!data.has_more, data.total);
 
         // Same fix as loadConversation()'s lastConversationHash - without
         // this, lastCustomerHash stayed "" until the first poll tick,
@@ -6607,11 +6651,13 @@ async function loadCustomers() {
         // anywhere else.
         // ----------------------------
 
-        const totalCustomers = customers.length;
+        const totalCustomers =
+            data.total !== undefined ? data.total : customers.length;
 
-        const qualifiedLeads = customers.filter(
-            c => (c.lead_score || 0) >= 80
-        ).length;
+        const qualifiedLeads =
+            data.qualified_total !== undefined
+                ? data.qualified_total
+                : customers.filter(c => (c.lead_score || 0) >= 80).length;
 
         // ----------------------------
         // Header KPIs
@@ -9145,16 +9191,18 @@ async function loadBellBadge() {
         if (!userId) return;
 
         const response = await fetch(
-            `/reminders?user_id=${encodeURIComponent(userId)}`
+            `/reminders?user_id=${encodeURIComponent(userId)}&limit=1`
         );
         const data = await response.json();
         const reminders = data.reminders || [];
 
         const today = new Date().toISOString().split("T")[0];
 
-        const overdueCount = reminders.filter(
-            r => r.due_date < today
-        ).length;
+        // overdue_count covers ALL active reminders server-side (the
+        // reminders list itself is paged).
+        const overdueCount = data.overdue_count !== undefined
+            ? data.overdue_count
+            : reminders.filter(r => r.due_date < today).length;
 
         const badge = document.getElementById("bellBadge");
 

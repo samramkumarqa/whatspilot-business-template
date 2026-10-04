@@ -5,6 +5,7 @@ import asyncio
 import logging
 
 from auth import enforce_tenant_access
+from url_safety import assert_public_url, UnsafeURLError
 from incremental_ingest import incremental_ingest
 from site_discovery import MAX_PAGES_PER_SITE
 from doc_tracker import get_indexed_pages, clear_registry
@@ -89,6 +90,16 @@ async def reindex(user_id: str, request: Request):
 async def add_site(request: WebsiteRequest, http_request: Request):
 
     enforce_tenant_access(http_request, request.user_id)
+
+    # SSRF guard - see url_safety.py. Rejects loopback/private/link-local/
+    # metadata addresses up front rather than at background-index time.
+    try:
+        await run_in_threadpool(assert_public_url, request.url)
+    except UnsafeURLError as e:
+        # Same {status, message} shape settings.html already renders for
+        # other add-website failures (an HTTPException's {detail} would
+        # show up there as "undefined").
+        return {"status": "error", "message": str(e)}
 
     try:
 

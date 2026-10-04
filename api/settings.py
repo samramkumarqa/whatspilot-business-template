@@ -131,13 +131,23 @@ async def get_number(
 
 
 @router.get("/customers/{user_id}")
-async def customers(user_id: str, request: Request):
+async def customers(user_id: str, request: Request, limit: int = 500, offset: int = 0):
+    """Paged list of customer phone numbers (default 500 per page)."""
 
     enforce_tenant_access(request, user_id)
 
+    limit = max(1, min(limit, 1000))
+    offset = max(0, offset)
+
+    # Fetch one extra row to learn whether another page exists.
+    rows = await run_in_threadpool(get_customers, user_id, limit + 1, offset)
+
     return {
         "status": "success",
-        "customers": await run_in_threadpool(get_customers, user_id)
+        "customers": rows[:limit],
+        "limit": limit,
+        "offset": offset,
+        "has_more": len(rows) > limit,
     }
 
 @router.get("/customers-last/{user_id}")

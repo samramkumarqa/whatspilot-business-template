@@ -28,6 +28,8 @@ from xml.etree import ElementTree
 
 import requests
 
+from url_safety import assert_public_url, redirect_guard_hook, UnsafeURLError
+
 from crawler import discover_links
 
 logger = logging.getLogger(__name__)
@@ -144,10 +146,13 @@ def _fetch(url):
 
     try:
 
+        assert_public_url(url)
+
         response = requests.get(
             url,
             timeout=REQUEST_TIMEOUT,
             headers=REQUEST_HEADERS,
+            hooks={"response": redirect_guard_hook},
         )
 
         if response.status_code != 200:
