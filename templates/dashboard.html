@@ -5653,10 +5653,10 @@ async function loadAutomationRules() {
 
                         <div>
 
-                            <h3>${rule.name}</h3>
+                            <h3>${escapeHtml(rule.name)}</h3>
 
                             <div class="automation-description">
-                                ${rule.description || ""}
+                                ${escapeHtml(rule.description || "")}
                             </div>
 
                         </div>
@@ -5694,7 +5694,7 @@ async function loadAutomationRules() {
                                         <span class="rule-chip">
                                             ${getConditionFieldLabel(c.field)}
                                             ${getOperatorLabel(c.operator)}
-                                            ${value}
+                                            ${escapeHtml(value)}
                                         </span>
                                     `;
 
@@ -5735,11 +5735,11 @@ async function loadAutomationRules() {
                                             </div>
 
                                             <div class="action-body">
-                                                ${a.params.text}
+                                                ${escapeHtml(a.params.text)}
                                             </div>
 
                                             <div class="action-footer">
-                                                ⏰ After <strong>${a.params.days}</strong> Day(s)
+                                                ⏰ After <strong>${escapeHtml(a.params.days)}</strong> Day(s)
                                             </div>
 
                                         </div>
@@ -5765,13 +5765,13 @@ async function loadAutomationRules() {
                                             </span>
 
                                             <span class="action-title">
-                                                ${a.name || "Unknown Action"}
+                                                ${escapeHtml(a.name || "Unknown Action")}
                                             </span>
 
                                         </div>
 
                                         <div class="action-body">
-                                            ${a.params.title || a.params.text || ""}
+                                            ${escapeHtml(a.params.title || a.params.text || "")}
                                         </div>
 
                                     </div>
@@ -5870,7 +5870,7 @@ async function editRule(ruleId, buttonEl) {
     });
 
     document.getElementById("editorTitle").innerHTML =
-        `Edit Rule - ${rule.name}`;
+        `Edit Rule - ${escapeHtml(rule.name)}`;
 
     document.getElementById("ruleName").value =
         rule.name || "";
